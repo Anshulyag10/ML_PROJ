@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Stocks - Cosmic Finance</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@100;200;400;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dystopian.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
+    
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <!-- Galaxy Background Canvas -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{ url_for('index') }}" class="navbar-brand">COSMIC FINANCE</a>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('portfolio_optimizer') }}" class="nav-link">Portfolio</a>
+                <a href="{{ url_for('price_predictor') }}" class="nav-link">Predictor</a>
+                <a href="{{ url_for('sentiment_analyzer') }}" class="nav-link">Sentiment</a>
+                <a href="{{ url_for('ticker_search') }}" class="nav-link">Tickers</a>
+                <a href="{{ url_for('compare') }}" class="nav-link active">Compare</a>
+                
+                {% if 'user_id' in session %}
+                <div class="user-menu">
+                    <button class="user-button">{{ session.username }} <span class="dropdown-arrow">▼</span></button>
+                    <div class="user-dropdown">
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                        <a href="#">Favorites</a>
+                        <a href="#">Portfolios</a>
+                        <a href="#">Settings</a>
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                </div>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="nav-link login-btn">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link register-btn">Register</a>
+                {% endif %}
+            </div>
+            
+            <button class="mobile-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <section class="compare-section">
+        <div class="container">
+            <h1 class="page-title glitch-text" data-text="STOCK COMPARISON">STOCK COMPARISON</h1>
+            <p class="page-subtitle terminal-text">Compare multiple assets across various metrics</p>
+            
+            {% if error %}
+            <div class="error-container">
+                <div class="error-icon"></div>
+                <h3>Analysis Error</h3>
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+            
+            <div class="compare-grid">
+                <!-- Input Panel -->
+                <div class="input-panel">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Comparison Parameters</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <form method="POST" class="compare-form">
+                                <div class="form-group">
+                                    <label for="tickers">Assets to Compare</label>
+                                    <div class="input-container">
+                                        <input type="text" id="tickers" name="tickers" class="neo-input" placeholder="e.g., AAPL, MSFT, GOOGL" required>
+                                        <div class="input-line"></div>
+                                    </div>
+                                    <div class="form-help">Enter 2-5 ticker symbols separated by commas</div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="period">Time Period</label>
+                                    <select id="period" name="period" class="neo-input">
+                                        <option value="1m">1 Month</option>
+                                        <option value="3m">3 Months</option>
+                                        <option value="6m">6 Months</option>
+                                        <option value="1y" selected>1 Year</option>
+                                        <option value="3y">3 Years</option>
+                                        <option value="5y">5 Years</option>
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="neo-button primary">
+                                    <span class="button-text">COMPARE ASSETS</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    {% if results %}
+                    <!-- Correlation Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Correlation Matrix</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div class="correlation-matrix">
+                                <table class="matrix-table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            {% for ticker in results.tickers %}
+                                            <th>{{ ticker }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for i in range(results.tickers|length) %}
+                                        <tr>
+                                            <th>{{ results.tickers[i] }}</th>
+                                            {% for j in range(results.tickers|length) %}
+                                            <td class="{% if results.correlation_matrix[i][j] > 0.7 %}high-corr{% elif results.correlation_matrix[i][j] < 0.3 %}low-corr{% endif %}">
+                                                {{ "%.2f" | format(results.correlation_matrix[i][j]) }}
+                                            </td>
+                                            {% endfor %}
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Results Panel -->
+                <div class="results-panel">
+                    {% if results %}
+                    <!-- Price Chart Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Normalized Price Comparison</h2>
+                            <div class="period-badge">{{ results.period }}</div>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div id="price-chart" class="chart-container"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Statistics Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Performance Metrics</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div class="stats-grid">
+                                {% for ticker, stat in results.statistics.items() %}
+                                <div class="stats-card">
+                                    <div class="stats-header">
+                                        <h3>{{ ticker }}</h3>
+                                        <div class="stats-company">{{ results.company_profiles[ticker].name }}</div>
+                                    </div>
+                                    
+                                    <div class="stats-body">
+                                        <div class="stat-row">
+                                            <div class="stat-label">Start Price</div>
+                                            <div class="stat-value">${{ "%.2f" | format(stat.start_price) }}</div>
+                                        </div>
+                                        
+                                        <div class="stat-row">
+                                            <div class="stat-label">End Price</div>
+                                            <div class="stat-value">${{ "%.2f" | format(stat.end_price) }}</div>
+                                        </div>
+                                        
+                                        <div class="stat-row">
+                                            <div class="stat-label">Change</div>
+                                            <div class="stat-value {% if stat.change_pct > 0 %}positive{% elif stat.change_pct < 0 %}negative{% endif %}">
+                                                {{ "%.2f" | format(stat.change_pct) }}%
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="stat-row">
+                                            <div class="stat-label">Volatility</div>
+                                            <div class="stat-value">{{ "%.2f" | format(stat.volatility) }}%</div>
+                                        </div>
+                                        
+                                        <div class="stat-row">
+                                            <div class="stat-label">Max Drawdown</div>
+                                            <div class="stat-value negative">-{{ "%.2f" | format(stat.max_drawdown) }}%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Placeholder for initial state -->
+                    <div class="panel">
+                        <div class="panel-body">
+                            <div class="placeholder-container">
+                                <div class="placeholder-icon compare-icon"></div>
+                                <h3>Enter assets to compare</h3>
+                                <p>Select multiple ticker symbols to analyze and compare their performance across different metrics</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cosmic Finance. All neural pathways reserved.</p>
+                <div class="system-time" id="footerTime">{{ current_date }}</div>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/space-anim.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    {% if price_chart %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var priceChartData = {{ price_chart|safe }};
+            Plotly.newPlot('price-chart', priceChartData.data, priceChartData.layout);
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

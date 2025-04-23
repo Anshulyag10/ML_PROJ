@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ profile.name }} - Cosmic Finance</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@100;200;400;700&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dystopian.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
+    
+    <!-- Plotly for charts -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <!-- Interactive Galaxy Background Canvas -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{ url_for('index') }}" class="navbar-brand">COSMIC FINANCE</a>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('portfolio_optimizer') }}" class="nav-link">Portfolio</a>
+                <a href="{{ url_for('price_predictor') }}" class="nav-link">Predictor</a>
+                <a href="{{ url_for('sentiment_analyzer') }}" class="nav-link">Sentiment</a>
+                <a href="{{ url_for('ticker_search') }}" class="nav-link active">Tickers</a>
+                <a href="{{ url_for('compare') }}" class="nav-link">Compare</a>
+                
+                {% if 'user_id' in session %}
+                <div class="user-menu">
+                    <button class="user-button">{{ session.username }} <span class="dropdown-arrow">▼</span></button>
+                    <div class="user-dropdown">
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                        <a href="#">Favorites</a>
+                        <a href="#">Portfolios</a>
+                        <a href="#">Settings</a>
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                </div>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="nav-link login-btn">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link register-btn">Register</a>
+                {% endif %}
+            </div>
+            
+            <button class="mobile-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <section class="company-profile-section">
+        <div class="container">
+            {% if error %}
+            <div class="error-container">
+                <div class="error-icon"></div>
+                <h3>Profile Error</h3>
+                <p>{{ error }}</p>
+            </div>
+            {% else %}
+            <h1 class="page-title glitch-text" data-text="{{ profile.name }}">{{ profile.name }}</h1>
+            <div class="ticker-badge large">{{ profile.ticker }}</div>
+            
+            <div class="profile-grid">
+                <!-- Company Overview -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Company Overview</h2>
+                    </div>
+                    
+                    <div class="panel-body">
+                        <div class="profile-header">
+                            <div class="company-details">
+                                <div class="detail-row">
+                                    <div class="detail-label">Exchange</div>
+                                    <div class="detail-value">{{ profile.exchange }}</div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="detail-label">Industry</div>
+                                    <div class="detail-value">{{ profile.industry }}</div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="detail-label">Current Price</div>
+                                    <div class="detail-value">${{ profile.current_price|round(2) }}</div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="detail-label">Market Cap</div>
+                                    <div class="detail-value">
+                                        {% if profile.market_cap > 1000000000000 %}
+                                            ${{ (profile.market_cap / 1000000000000)|round(2) }}T
+                                        {% elif profile.market_cap > 1000000000 %}
+                                            ${{ (profile.market_cap / 1000000000)|round(2) }}B
+                                        {% elif profile.market_cap > 1000000 %}
+                                            ${{ (profile.market_cap / 1000000)|round(2) }}M
+                                        {% else %}
+                                            ${{ profile.market_cap|round(2) }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="company-actions">
+                                <a href="{{ url_for('price_predictor', ticker=profile.ticker) }}" class="neo-button">Predict</a>
+                                <a href="{{ url_for('sentiment_analyzer', ticker=profile.ticker) }}" class="neo-button">Sentiment</a>
+                                {% if 'user_id' in session %}
+                                <button class="neo-button outline" id="addFavoriteBtn">
+                                    <span class="button-icon star-icon"></span>
+                                    <span class="button-text">Add to Favorites</span>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="company-description">
+                            <p>{{ profile.description }}</p>
+                        </div>
+                        
+                        {% if profile.website and profile.website != '#' %}
+                        <div class="company-website">
+                            <a href="{{ profile.website }}" target="_blank" class="website-link">Visit Company Website</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Financial Metrics -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Financial Metrics</h2>
+                    </div>
+                    
+                    <div class="panel-body">
+                        <div class="metrics-grid">
+                            <div class="metric-card">
+                                <div class="metric-label">P/E Ratio</div>
+                                <div class="metric-value">{{ profile.pe_ratio|round(2) }}</div>
+                            </div>
+                            
+                            <div class="metric-card">
+                                <div class="metric-label">EPS</div>
+                                <div class="metric-value">${{ profile.eps|round(2) }}</div>
+                            </div>
+                            
+                            <div class="metric-card">
+                                <div class="metric-label">Dividend Yield</div>
+                                <div class="metric-value">{{ profile.dividend_yield|round(2) }}%</div>
+                            </div>
+                            
+                            <div class="metric-card">
+                                <div class="metric-label">Beta</div>
+                                <div class="metric-value">{{ profile.beta|round(2) }}</div>
+                            </div>
+                            
+                            <div class="metric-card">
+                                <div class="metric-label">52W High</div>
+                                <div class="metric-value">${{ profile['52w_high']|round(2) }}</div>
+                            </div>
+                            
+                            <div class="metric-card">
+                                <div class="metric-label">52W Low</div>
+                                <div class="metric-value">${{ profile['52w_low']|round(2) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Price Chart -->
+                <div class="panel full-width">
+                    <div class="panel-header">
+                        <h2>Price History</h2>
+                    </div>
+                    
+                    <div class="panel-body">
+                        <div id="price-chart" class="chart-container"></div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cosmic Finance. All neural pathways reserved.</p>
+                <div class="system-time" id="footerTime">{{ current_date }}</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/space-anim.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    {% if price_chart %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load price chart
+            var priceChartData = {{ price_chart|safe }};
+            Plotly.newPlot('price-chart', priceChartData.data, priceChartData.layout);
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

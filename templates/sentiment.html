@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment Analyzer - Cosmic Finance</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@100;200;400;700&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dystopian.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
+    
+    <!-- Plotly for charts -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <!-- Interactive Galaxy Background Canvas -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{ url_for('index') }}" class="navbar-brand">COSMIC FINANCE</a>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('portfolio_optimizer') }}" class="nav-link">Portfolio</a>
+                <a href="{{ url_for('price_predictor') }}" class="nav-link">Predictor</a>
+                <a href="{{ url_for('sentiment_analyzer') }}" class="nav-link active">Sentiment</a>
+                <a href="{{ url_for('ticker_search') }}" class="nav-link">Tickers</a>
+                <a href="{{ url_for('compare') }}" class="nav-link">Compare</a>
+                
+                {% if 'user_id' in session %}
+                <div class="user-menu">
+                    <button class="user-button">{{ session.username }} <span class="dropdown-arrow">▼</span></button>
+                    <div class="user-dropdown">
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                        <a href="#">Favorites</a>
+                        <a href="#">Portfolios</a>
+                        <a href="#">Settings</a>
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                </div>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="nav-link login-btn">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link register-btn">Register</a>
+                {% endif %}
+            </div>
+            
+            <button class="mobile-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <section class="sentiment-section">
+        <div class="container">
+            <h1 class="page-title glitch-text" data-text="NEURAL SENTIMENT ANALYZER">NEURAL SENTIMENT ANALYZER</h1>
+            <p class="page-subtitle terminal-text">Decode market sentiment with advanced NLP algorithms</p>
+            
+            {% if error %}
+            <div class="error-container">
+                <div class="error-icon"></div>
+                <h3>Analysis Error</h3>
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+            
+            <div class="sentiment-grid">
+                <!-- Input panel -->
+                <div class="input-panel">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Analysis Parameters</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <form action="{{ url_for('sentiment_analyzer') }}" method="POST" class="sentiment-form">
+                                <div class="form-group">
+                                    <label for="ticker">Asset Ticker</label>
+                                    <div class="input-container">
+                                        <input type="text" id="ticker" name="ticker" class="neo-input" placeholder="e.g., AAPL, RELIANCE.NS" required>
+                                        <div class="input-line"></div>
+                                        <div class="input-icon ticker-input-icon"></div>
+                                        <button type="button" class="ticker-search-button" id="tickerSearchBtn">
+                                            <div class="search-icon"></div>
+                                        </button>
+                                    </div>
+                                    <div class="ticker-suggestions" id="tickerSuggestions"></div>
+                                </div>
+                                
+                                <button type="submit" class="neo-button primary">ANALYZE SENTIMENT</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    {% if results %}
+                    <!-- Company Info Panel -->
+                    <div class="panel company-panel">
+                        <div class="panel-header">
+                            <div class="company-header">
+                                <h2>{{ results.company_info.name }}</h2>
+                                <div class="ticker-badge">{{ results.ticker }}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div class="company-stats">
+                                <div class="stat">
+                                    <div class="stat-label">Price</div>
+                                    <div class="stat-value">${{ results.company_info.current_price|round(2) }}</div>
+                                </div>
+                                
+                                <div class="stat">
+                                    <div class="stat-label">5-Day Change</div>
+                                    <div class="stat-value {% if results.price_change_5d > 0 %}positive{% elif results.price_change_5d < 0 %}negative{% endif %}">
+                                        {% if results.price_change_5d > 0 %}+{% endif %}{{ results.price_change_5d|round(2) }}%
+                                    </div>
+                                </div>
+                                
+                                <div class="stat">
+                                    <div class="stat-label">Industry</div>
+                                    <div class="stat-value">{{ results.company_info.industry }}</div>
+                                </div>
+                                
+                                <div class="stat">
+                                    <div class="stat-label">Sentiment</div>
+                                    <div class="stat-value mood-{{ results.market_mood|lower }}">{{ results.market_mood }}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="company-description">{{ results.company_info.description[:200] }}{% if results.company_info.description|length > 200 %}...{% endif %}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sentiment Overview -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Sentiment Overview</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div class="sentiment-summary">
+                                <div class="sentiment-gauge" data-sentiment="{{ results.average_score }}">
+                                    <div class="gauge-label">Market Mood</div>
+                                    <div class="gauge-value mood-{{ results.market_mood|lower }}">{{ results.market_mood }}</div>
+                                    <div class="gauge-score">{{ (results.average_score * 100)|round(1) }}</div>
+                                </div>
+                                
+                                <div class="sentiment-counts">
+                                    <div class="count-item">
+                                        <div class="count-value positive">{{ results.sentiment_counts.positive }}</div>
+                                        <div class="count-label">Positive</div>
+                                    </div>
+                                    
+                                    <div class="count-item">
+                                        <div class="count-value neutral">{{ results.sentiment_counts.neutral }}</div>
+                                        <div class="count-label">Neutral</div>
+                                    </div>
+                                    
+                                    <div class="count-item">
+                                        <div class="count-value negative">{{ results.sentiment_counts.negative }}</div>
+                                        <div class="count-label">Negative</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="sentiment-meta">
+                                    <div class="meta-item">
+                                        <div class="meta-label">Confidence</div>
+                                        <div class="meta-value">{{ (results.confidence * 100)|round(0) }}%</div>
+                                    </div>
+                                    
+                                    <div class="meta-item">
+                                        <div class="meta-label">Articles Analyzed</div>
+                                        <div class="meta-value">{{ results.articles|length }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Results panel -->
+                <div class="results-panel">
+                    {% if results %}
+                    <!-- Sentiment Chart -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Sentiment Distribution</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div id="sentiment-chart" class="chart-container"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- News Articles -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Analyzed News Articles</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div class="article-filters">
+                                <button class="filter-btn active" data-filter="all">All</button>
+                                <button class="filter-btn" data-filter="positive">Positive</button>
+                                <button class="filter-btn" data-filter="neutral">Neutral</button>
+                                <button class="filter-btn" data-filter="negative">Negative</button>
+                            </div>
+                            
+                            <div class="articles-list">
+                                {% for article in results.articles %}
+                                <div class="article-item" data-sentiment="{{ article.sentiment|lower }}">
+                                    <div class="article-header">
+                                        <div class="article-title">{{ article.title }}</div>
+                                        <div class="sentiment-badge {{ article.sentiment|lower }}">{{ article.sentiment }}</div>
+                                    </div>
+                                    
+                                    <div class="article-meta">
+                                        <div class="article-source">{{ article.source }}</div>
+                                        <div class="article-date">{{ article.date }}</div>
+                                        <div class="article-score">Score: {{ (article.score * 100)|round(1) }}</div>
+                                    </div>
+                                    
+                                    <a href="{{ article.link }}" target="_blank" class="article-link">Read Article</a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Placeholder -->
+                    <div class="panel">
+                        <div class="panel-body">
+                            <div class="placeholder-container">
+                                <div class="placeholder-icon sentiment-icon"></div>
+                                <h3>Enter a ticker to analyze market sentiment</h3>
+                                <p>Our NLP algorithms will analyze news articles, social media trends and financial reports to determine market sentiment</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cosmic Finance. All neural pathways reserved.</p>
+                <div class="system-time" id="footerTime">{{ current_date }}</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/space-anim.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ticker-search.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    {% if results %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create sentiment chart
+            const sentimentChart = document.getElementById('sentiment-chart');
+            
+            if (sentimentChart) {
+                const data = [{
+                    values: [
+                        {{ results.sentiment_counts.positive }},
+                        {{ results.sentiment_counts.neutral }},
+                        {{ results.sentiment_counts.negative }}
+                    ],
+                    labels: ['Positive', 'Neutral', 'Negative'],
+                    type: 'pie',
+                    hole: 0.4,
+                    textinfo: 'label+percent',
+                    textposition: 'inside',
+                    marker: {
+                        colors: ['#50fa7b', '#8be9fd', '#ff5555'],
+                        line: {
+                            color: '#12121f',
+                            width: 2
+                        }
+                    }
+                }];
+                
+                const layout = {
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        family: 'Rajdhani, sans-serif',
+                        color: '#a4b8c4'
+                    },
+                    showlegend: false,
+                    margin: {
+                        l: 20,
+                        r: 20,
+                        t: 20,
+                        b: 20
+                    },
+                    height: 350
+                };
+                
+                Plotly.newPlot('sentiment-chart', data, layout);
+            }
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Cosmic Finance</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@100;200;400;700&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dystopian.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
+</head>
+<body>
+    <!-- Interactive Galaxy Background Canvas -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Authentication Section -->
+    <section class="auth-section">
+        <div class="container">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <h2 class="auth-title glitch-text" data-text="LOGIN">LOGIN</h2>
+                    <p class="auth-subtitle">Access your neural finance dashboard</p>
+                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                      {% if messages %}
+                        {% for category, message in messages %}
+                          <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                      {% endif %}
+                    {% endwith %}
+                    
+                    <form action="{{ url_for('login') }}" method="POST" class="auth-form">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <div class="input-container">
+                                <input type="text" id="username" name="username" class="neo-input" required>
+                                <div class="input-line"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <div class="input-container">
+                                <input type="password" id="password" name="password" class="neo-input" required>
+                                <div class="input-line"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-options">
+                            <label class="neo-toggle">
+                                <input type="checkbox" name="remember" value="1">
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label">Remember me</span>
+                            </label>
+                            
+                            <a href="{{ url_for('forgot_password') }}" class="forgot-link">Forgot password?</a>
+                        </div>
+                        
+                        <button type="submit" class="neo-button primary full-width">LOGIN</button>
+                    </form>
+                    
+                    <div class="auth-separator">
+                        <span>or continue with</span>
+                    </div>
+                    
+                    <div class="social-auth">
+                        <button type="button" class="social-auth-btn">
+                            <span class="social-icon google-icon"></span>
+                            <span>Google</span>
+                        </button>
+                        
+                        <button type="button" class="social-auth-btn">
+                            <span class="social-icon github-icon"></span>
+                            <span>GitHub</span>
+                        </button>
+                    </div>
+                    
+                    <div class="auth-footer">
+                        <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
+                    </div>
+                </div>
+                
+                <div class="circuit-decoration left"></div>
+                <div class="circuit-decoration right"></div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cosmic Finance. All neural pathways reserved.</p>
+                <div class="system-time" id="footerTime">{{ current_date }}</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/space-anim.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

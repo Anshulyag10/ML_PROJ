@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Registration - Cosmic Finance</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@100;200;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dystopian.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+</head>
+<body>
+    <!-- Interactive Galaxy Background Canvas -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{ url_for('index') }}" class="navbar-brand">COSMIC FINANCE</a>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('portfolio_optimizer') }}" class="nav-link">Portfolio</a>
+                <a href="{{ url_for('price_predictor') }}" class="nav-link">Predictor</a>
+                <a href="{{ url_for('sentiment_analyzer') }}" class="nav-link">Sentiment</a>
+                <a href="{{ url_for('ticker_search') }}" class="nav-link">Tickers</a>
+                <a href="{{ url_for('compare') }}" class="nav-link">Compare</a>
+                
+                <a href="{{ url_for('login') }}" class="nav-link login-btn">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link register-btn active">Register</a>
+            </div>
+            
+            <button class="mobile-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Registration Section -->
+    <section class="auth-section">
+        <div class="container">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <h2 class="auth-title glitch-text" data-text="NEURAL REGISTRATION">NEURAL REGISTRATION</h2>
+                    <p class="auth-subtitle terminal-text">Create your quantum identity</p>
+                    
+                    {% if error %}
+                    <div class="error-message">
+                        <div class="error-icon"></div>
+                        <div class="error-text">{{ error }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    <form class="auth-form" method="POST" action="{{ url_for('register') }}">
+                        <div class="form-group">
+                            <label for="username">Neural ID</label>
+                            <div class="input-container">
+                                <input type="text" id="username" name="username" class="neo-input" required autocomplete="username">
+                                <div class="input-line"></div>
+                                <div class="input-icon user-input-icon"></div>
+                            </div>
+                            <div class="input-requirements">6+ characters, alphanumeric only</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Neural Beacon (Email)</label>
+                            <div class="input-container">
+                                <input type="email" id="email" name="email" class="neo-input" required autocomplete="email">
+                                <div class="input-line"></div>
+                                <div class="input-icon email-input-icon"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="password">Neural Key</label>
+                            <div class="input-container">
+                                <input type="password" id="password" name="password" class="neo-input" required autocomplete="new-password">
+                                <div class="input-line"></div>
+                                <div class="input-icon password-input-icon"></div>
+                                <button type="button" class="password-toggle" aria-label="Toggle password visibility"></button>
+                            </div>
+                            <div class="password-strength">
+                                <div class="strength-bars">
+                                    <div class="strength-segment"></div>
+                                    <div class="strength-segment"></div>
+                                    <div class="strength-segment"></div>
+                                    <div class="strength-segment"></div>
+                                </div>
+                                <div class="strength-text">Neural key strength</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="confirm_password">Confirm Neural Key</label>
+                            <div class="input-container">
+                                <input type="password" id="confirm_password" name="confirm_password" class="neo-input" required autocomplete="new-password">
+                                <div class="input-line"></div>
+                                <div class="input-icon password-input-icon"></div>
+                            </div>
+                            <div class="match-indicator">Keys must match</div>
+                        </div>
+                        
+                        <div class="form-agreement">
+                            <label class="neo-checkbox">
+                                <input type="checkbox" name="terms" id="terms" required>
+                                <span class="checkbox-indicator"></span>
+                                <span class="checkbox-text">I accept the <a href="#">Neural Protocol</a> and <a href="#">Quantum Privacy Policy</a></span>
+                            </label>
+                        </div>
+                        
+                        <button type="submit" class="neo-button primary full-width">Create Neural Identity</button>
+                    </form>
+                    
+                    <div class="auth-separator">
+                        <span>OR</span>
+                    </div>
+                    
+                    <div class="social-auth">
+                        <button class="social-auth-btn google">
+                            <span class="social-icon"></span>
+                            <span class="social-text">Register with Google</span>
+                        </button>
+                        
+                        <button class="social-auth-btn github">
+                            <span class="social-icon"></span>
+                            <span class="social-text">Register with GitHub</span>
+                        </button>
+                    </div>
+                    
+                    <div class="auth-footer">
+                        <p>Already have a neural identity? <a href="{{ url_for('login') }}">Access now</a></p>
+                    </div>
+                </div>
+                
+                <div class="circuit-decoration left"></div>
+                <div class="circuit-decoration right"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cosmic Finance. All neural pathways reserved.</p>
+                <div class="system-time">{{ current_date }}</div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/galaxy-background.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+</html>

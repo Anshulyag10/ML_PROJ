@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Optimizer - Cosmic Finance</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@100;200;400;700&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dystopian.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
+    
+    <!-- Plotly for charts -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <!-- Interactive Galaxy Background Canvas -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{ url_for('index') }}" class="navbar-brand">COSMIC FINANCE</a>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('portfolio_optimizer') }}" class="nav-link active">Portfolio</a>
+                <a href="{{ url_for('price_predictor') }}" class="nav-link">Predictor</a>
+                <a href="{{ url_for('sentiment_analyzer') }}" class="nav-link">Sentiment</a>
+                <a href="{{ url_for('ticker_search') }}" class="nav-link">Tickers</a>
+                <a href="{{ url_for('compare') }}" class="nav-link">Compare</a>
+                
+                {% if 'user_id' in session %}
+                <div class="user-menu">
+                    <button class="user-button">{{ session.username }} <span class="dropdown-arrow">▼</span></button>
+                    <div class="user-dropdown">
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                        <a href="#">Favorites</a>
+                        <a href="#">Portfolios</a>
+                        <a href="#">Settings</a>
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                </div>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="nav-link login-btn">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link register-btn">Register</a>
+                {% endif %}
+            </div>
+            
+            <button class="mobile-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <section class="portfolio-section">
+        <div class="container">
+            <h1 class="page-title glitch-text" data-text="QUANTUM PORTFOLIO OPTIMIZER">QUANTUM PORTFOLIO OPTIMIZER</h1>
+            <p class="page-subtitle terminal-text">Optimize asset allocation with advanced algorithmic strategies</p>
+            
+            {% if error %}
+            <div class="error-container">
+                <div class="error-icon"></div>
+                <h3>Optimization Error</h3>
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+            
+            <div class="portfolio-grid">
+                <!-- Input panel -->
+                <div class="input-panel">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Optimization Parameters</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <form action="{{ url_for('portfolio_optimizer') }}" method="POST" class="portfolio-form">
+                                <div class="form-group">
+                                    <label for="tickers">Asset List</label>
+                                    <div class="input-container">
+                                        <input type="text" id="tickers" name="tickers" class="neo-input" placeholder="e.g., AAPL, MSFT, GOOGL, AMZN" required>
+                                        <div class="input-line"></div>
+                                    </div>
+                                    <div class="form-help">Enter ticker symbols separated by commas</div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="risk_preference">Risk Preference</label>
+                                    <div class="risk-slider-container">
+                                        <input type="range" id="risk_slider" min="1" max="3" value="2" class="risk-slider">
+                                        <div class="risk-labels">
+                                            <span class="risk-label">Low</span>
+                                            <span class="risk-label">Moderate</span>
+                                            <span class="risk-label">High</span>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="risk_preference" name="risk_preference" value="Moderate">
+                                </div>
+                                
+                                <button type="submit" class="neo-button primary">OPTIMIZE PORTFOLIO</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    {% if results %}
+                    <!-- Strategy Description -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Optimization Strategy</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div class="strategy-description">
+                                <p>This portfolio optimization uses Modern Portfolio Theory with a <span class="strategy-risk">{{ results.risk_preference }}</span> risk tolerance setting.</p>
+                                
+                                <div class="strategy-metrics">
+                                    <div class="metric">
+                                        <div class="metric-label">Expected Return</div>
+                                        <div class="metric-value">{{ results.portfolio_return|round(2) }}%</div>
+                                    </div>
+                                    
+                                    <div class="metric">
+                                        <div class="metric-label">Volatility</div>
+                                        <div class="metric-value">{{ results.portfolio_volatility|round(2) }}%</div>
+                                    </div>
+                                    
+                                    <div class="metric">
+                                        <div class="metric-label">Sharpe Ratio</div>
+                                        <div class="metric-value">{{ results.sharpe_ratio|round(2) }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Results panel -->
+                <div class="results-panel">
+                    {% if results %}
+                    <!-- Allocation Panel -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Optimal Allocation</h2>
+                            <div class="panel-actions">
+                                <button class="action-button" data-action="download" data-tooltip="Export Data">
+                                    <span class="button-icon download-icon"></span>
+                                </button>
+                                <button class="action-button" data-action="save" data-tooltip="Save Portfolio">
+                                    <span class="button-icon save-icon"></span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div id="allocation-chart" class="chart-container"></div>
+                            
+                            <div class="allocation-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Asset</th>
+                                            <th>Company</th>
+                                            <th>Allocation</th>
+                                            <th>Expected Return</th>
+                                            <th>Volatility</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for asset in results.portfolio_data %}
+                                        <tr>
+                                            <td>{{ asset.ticker }}</td>
+                                            <td>{{ asset.company_info.name }}</td>
+                                            <td>{{ asset.weight|round(2) }}%</td>
+                                            <td class="{% if asset.expected_return > 0 %}positive{% else %}negative{% endif %}">
+                                                {{ asset.expected_return|round(2) }}%
+                                            </td>
+                                            <td>{{ asset.volatility|round(2) }}%</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Asset Information -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h2>Asset Information</h2>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div class="assets-grid">
+                                {% for asset in results.portfolio_data %}
+                                <div class="asset-card">
+                                    <div class="asset-header">
+                                        <h3>{{ asset.ticker }}</h3>
+                                        <div class="allocation-badge">{{ asset.weight|round(2) }}%</div>
+                                    </div>
+                                    
+                                    <div class="asset-company">{{ asset.company_info.name }}</div>
+                                    
+                                    <div class="asset-info">
+                                        <div class="info-row">
+                                            <div class="info-label">Current Price</div>
+                                            <div class="info-value">${{ asset.company_info.current_price|round(2) }}</div>
+                                        </div>
+                                        
+                                        <div class="info-row">
+                                            <div class="info-label">Market Cap</div>
+                                            <div class="info-value">
+                                            {% if asset.company_info.market_cap > 1000000000000 %}
+                                                ${{ (asset.company_info.market_cap / 1000000000000)|round(2) }}T
+                                            {% elif asset.company_info.market_cap > 1000000000 %}
+                                                ${{ (asset.company_info.market_cap / 1000000000)|round(2) }}B
+                                            {% elif asset.company_info.market_cap > 1000000 %}
+                                                ${{ (asset.company_info.market_cap / 1000000)|round(2) }}M
+                                            {% else %}
+                                                ${{ asset.company_info.market_cap|round(2) }}
+                                            {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="info-row">
+                                            <div class="info-label">P/E Ratio</div>
+                                            <div class="info-value">{{ asset.company_info.pe_ratio|round(2) }}</div>
+                                        </div>
+                                        
+                                        <div class="info-row">
+                                            <div class="info-label">Beta</div>
+                                            <div class="info-value">{{ asset.company_info.beta|round(2) }}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <a href="{{ url_for('company_profile', ticker=asset.ticker) }}" class="neo-button small">View Details</a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Placeholder -->
+                    <div class="panel">
+                        <div class="panel-body">
+                            <div class="placeholder-container">
+                                <div class="placeholder-icon portfolio-icon"></div>
+                                <h3>Enter assets to build an optimal portfolio</h3>
+                                <p>Our quantum optimization algorithms will create the ideal asset allocation based on your risk tolerance</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cosmic Finance. All neural pathways reserved.</p>
+                <div class="system-time" id="footerTime">{{ current_date }}</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/space-anim.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    {% if results %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create allocation chart
+            const allocationChart = document.getElementById('allocation-chart');
+            if (allocationChart) {
+                const assets = {{ results.portfolio_data|map(attribute='ticker')|list|tojson }};
+                const allocations = {{ results.portfolio_data|map(attribute='weight')|list|tojson }};
+                
+                const data = [{
+                    type: 'pie',
+                    labels: assets,
+                    values: allocations,
+                    textinfo: 'label+percent',
+                    textposition: 'inside',
+                    automargin: true,
+                    hole: 0.4,
+                    marker: {
+                        colors: ['#00e5ff', '#76ff03', '#ff1744', '#ffb86c', '#bd00ff', '#0ff8e7', '#ff9e44'],
+                        line: {
+                            color: '#12121f',
+                            width: 2
+                        }
+                    }
+                }];
+                
+                const layout = {
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: {
+                        family: 'Rajdhani, sans-serif',
+                        color: '#a4b8c4'
+                    },
+                    showlegend: false,
+                    margin: {
+                        l: 20,
+                        r: 20,
+                        t: 20,
+                        b: 20
+                    },
+                    height: 350
+                };
+                
+                Plotly.newPlot('allocation-chart', data, layout);
+            }
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Finance - Neural Market Analysis</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@100;200;400;700&display=swap" rel="stylesheet">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dystopian.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
+</head>
+<body>
+    <!-- Interactive Galaxy Background Canvas -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{ url_for('index') }}" class="navbar-brand">COSMIC FINANCE</a>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link active">Home</a>
+                <a href="{{ url_for('portfolio_optimizer') }}" class="nav-link">Portfolio</a>
+                <a href="{{ url_for('price_predictor') }}" class="nav-link">Predictor</a>
+                <a href="{{ url_for('sentiment_analyzer') }}" class="nav-link">Sentiment</a>
+                <a href="{{ url_for('ticker_search') }}" class="nav-link">Tickers</a>
+                <a href="{{ url_for('compare') }}" class="nav-link">Compare</a>
+                
+                {% if 'user_id' in session %}
+                <div class="user-menu">
+                    <button class="user-button">{{ session.username }} <span class="dropdown-arrow">▼</span></button>
+                    <div class="user-dropdown">
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                        <a href="#">Favorites</a>
+                        <a href="#">Portfolios</a>
+                        <a href="#">Settings</a>
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                </div>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="nav-link login-btn">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link register-btn">Register</a>
+                {% endif %}
+            </div>
+            
+            <button class="mobile-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="display-text glitch-text" data-text="COSMIC FINANCE">COSMIC FINANCE</h1>
+            <p class="subtitle-text terminal-text">Decode market patterns with neural networks</p>
+            <div class="cta-buttons">
+                <a href="#get-started" class="neo-button primary">Get Started</a>
+                <a href="#advanced-tech" class="neo-button">Learn More</a>
+            </div>
+            <div class="system-time" id="systemTime">{{ current_date }}</div>
+        </div>
+        
+        <div class="data-streams">
+            <div class="data-stream"></div>
+            <div class="data-stream"></div>
+            <div class="data-stream"></div>
+        </div>
+    </section>
+
+    <!-- Main Features -->
+    <section class="features-section" id="get-started">
+        <div class="container">
+            <h2 class="section-title neo-text">Neural Analysis Tools</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon predictor-icon"></div>
+                    <h3>Price Prediction</h3>
+                    <p>Multi-model neural networks forecast future asset prices with advanced pattern recognition</p>
+                    <a href="{{ url_for('price_predictor') }}" class="neo-button small">Predict Prices</a>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon sentiment-icon"></div>
+                    <h3>Sentiment Analysis</h3>
+                    <p>NLP algorithms decode market sentiment across news, social media, and financial reports</p>
+                    <a href="{{ url_for('sentiment_analyzer') }}" class="neo-button small">Analyze Sentiment</a>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon portfolio-icon"></div>
+                    <h3>Portfolio Optimization</h3>
+                    <p>Quantum algorithms generate optimal asset allocations based on your risk profile</p>
+                    <a href="{{ url_for('portfolio_optimizer') }}" class="neo-button small">Optimize Portfolio</a>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon ticker-icon"></div>
+                    <h3>Global Ticker Search</h3>
+                    <p>Find any listed asset across global markets including NYSE, NASDAQ, NSE, BSE and more</p>
+                    <a href="{{ url_for('ticker_search') }}" class="neo-button small">Search Tickers</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Advanced Technology Section -->
+    <section id="advanced-tech" class="tech-section">
+        <div class="container">
+            <h2 class="section-title neo-text">Advanced Neural Technologies</h2>
+            <p class="section-subtitle">Our proprietary algorithms decode market patterns beyond human perception</p>
+            
+            <div class="tech-tabs">
+                <div class="tab active" data-tab="lstm">LSTM Networks</div>
+                <div class="tab" data-tab="nlp">NLP Sentiment Analysis</div>
+            </div>
+            
+            <div class="tech-content">
+                <!-- LSTM Tab Content -->
+                <div class="tab-content active" id="lstm-content">
+                    <div class="tech-grid">
+                        <div class="tech-visual">
+                            <div class="lstm-visualization">
+                                <div class="lstm-cell">
+                                    <div class="lstm-component forget-gate" data-tooltip="Forget Gate">
+                                        <div class="sigmoid-icon"></div>
+                                    </div>
+                                    <div class="lstm-component input-gate" data-tooltip="Input Gate">
+                                        <div class="sigmoid-icon"></div>
+                                    </div>
+                                    <div class="lstm-component cell-state" data-tooltip="Cell State"></div>
+                                    <div class="lstm-component output-gate" data-tooltip="Output Gate">
+                                        <div class="sigmoid-icon"></div>
+                                    </div>
+                                    <div class="lstm-flows">
+                                        <div class="flow horizontal"></div>
+                                        <div class="flow vertical"></div>
+                                        <div class="flow diagonal"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tech-info">
+                            <h3>Long Short-Term Memory Networks</h3>
+                            <p>Our LSTM models identify long-term dependencies in financial time series data, allowing them to detect complex market cycles and persistent patterns.</p>
+                            
+                            <div class="tech-features">
+                                <div class="tech-feature">
+                                    <h4>Memory Cells</h4>
+                                    <p>Specialized neurons retain information over extended sequences, essential for long-term price patterns</p>
+                                </div>
+                                <div class="tech-feature">
+                                    <h4>Gate Controls</h4>
+                                    <p>Sophisticated gates control what information is retained or forgotten, filtering market noise</p>
+                                </div>
+                                <div class="tech-feature">
+                                    <h4>Deep Architecture</h4>
+                                    <p>60-day lookback windows with multiple stacked LSTM layers capture hierarchical patterns</p>
+                                </div>
+                            </div>
+                            
+                            <div class="advantage-list">
+                                <div class="advantage">
+                                    <div class="advantage-icon"></div>
+                                    <div class="advantage-text">Excels at predicting markets with long-term cycles</div>
+                                </div>
+                                <div class="advantage">
+                                    <div class="advantage-icon"></div>
+                                    <div class="advantage-text">Maintains memory of critical market events</div>
+                                </div>
+                                <div class="advantage">
+                                    <div class="advantage-icon"></div>
+                                    <div class="advantage-text">Filters out noise while preserving trend signals</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- NLP Tab Content -->
+                <div class="tab-content" id="nlp-content">
+                    <div class="tech-grid">
+                        <div class="tech-visual">
+                            <div class="nlp-visualization">
+                                <div class="text-stream"></div>
+                                <div class="sentiment-analysis"></div>
+                            </div>
+                        </div>
+                        <div class="tech-info">
+                            <h3>NLP Sentiment Analysis</h3>
+                            <p>Our natural language processing models analyze millions of news articles, social media posts, and financial reports to gauge market sentiment.</p>
+                            
+                            <div class="tech-features">
+                                <div class="tech-feature">
+                                    <h4>Transformer Architecture</h4>
+                                    <p>Uses attention mechanisms to understand context and meaning in financial texts</p>
+                                </div>
+                                <div class="tech-feature">
+                                    <h4>Multi-source Integration</h4>
+                                    <p>Combines signals from diverse information sources with proper weighting</p>
+                                </div>
+                                <div class="tech-feature">
+                                    <h4>Entity Recognition</h4>
+                                    <p>Identifies companies, products, and events that impact market sentiment</p>
+                                </div>
+                            </div>
+                            
+                            <div class="advantage-list">
+                                <div class="advantage">
+                                    <div class="advantage-icon"></div>
+                                    <div class="advantage-text">Detects market sentiment shifts before price movements</div>
+                                </div>
+                                <div class="advantage">
+                                    <div class="advantage-icon"></div>
+                                    <div class="advantage-text">Quantifies the impact of news and social chatter</div>
+                                </div>
+                                <div class="advantage">
+                                    <div class="advantage-icon"></div>
+                                    <div class="advantage-text">Filters out noise to identify meaningful signals</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cosmic Finance. All neural pathways reserved.</p>
+                <div class="system-time" id="footerTime">{{ current_date }}</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts - Note the order matters -->
+    <script src="{{ url_for('static', filename='js/space-anim.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Ticker Search - Cosmic Finance</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@100;200;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dystopian.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+</head>
+<body>
+    <!-- Interactive Galaxy Background Canvas -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{ url_for('index') }}" class="navbar-brand">COSMIC FINANCE</a>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('portfolio_optimizer') }}" class="nav-link">Portfolio</a>
+                <a href="{{ url_for('price_predictor') }}" class="nav-link">Predictor</a>
+                <a href="{{ url_for('sentiment_analyzer') }}" class="nav-link">Sentiment</a>
+                <a href="{{ url_for('ticker_search') }}" class="nav-link active">Tickers</a>
+                <a href="{{ url_for('compare') }}" class="nav-link">Compare</a>
+                
+                {% if session.get('user_id') %}
+                <div class="user-menu">
+                    <button class="user-button">{{ session.get('username') }} <span class="dropdown-arrow">▼</span></button>
+                    <div class="user-dropdown">
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                        <a href="{{ url_for('favorites') }}">Favorites</a>
+                        <a href="{{ url_for('portfolios') }}">My Portfolios</a>
+                        <a href="{{ url_for('settings') }}">Settings</a>
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                </div>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="nav-link login-btn">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link register-btn">Register</a>
+                {% endif %}
+            </div>
+            
+            <button class="mobile-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <section class="search-section">
+        <div class="container">
+            <h1 class="page-title glitch-text" data-text="GLOBAL TICKER SEARCH">GLOBAL TICKER SEARCH</h1>
+            <p class="page-subtitle terminal-text">Access financial assets from exchanges worldwide</p>
+            
+            <div class="search-container">
+                <div class="panel search-panel">
+                    <div class="panel-header">
+                        <h2>Quantum Asset Locator</h2>
+                    </div>
+                    
+                    <div class="panel-body">
+                        <form class="search-form" method="POST" action="{{ url_for('ticker_search') }}">
+                            <div class="main-search">
+                                <div class="input-container">
+                                    <input type="text" id="company_name" name="company_name" class="neo-input large" placeholder="Enter company name or ticker (e.g., Apple, Reliance Industries, GOOGL)" required>
+                                    <div class="input-line"></div>
+                                    <button type="submit" class="search-button">
+                                        <span class="search-icon"></span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="search-filters">
+                                <div class="filter-section">
+                                    <h3>Markets</h3>
+                                    <div class="filter-options">
+                                        <label class="neo-checkbox">
+                                            <input type="checkbox" name="markets[]" value="us" checked>
+                                            <span class="checkbox-indicator"></span>
+                                            <span class="checkbox-text">US (NYSE, NASDAQ)</span>
+                                        </label>
+                                        
+                                        <label class="neo-checkbox">
+                                            <input type="checkbox" name="markets[]" value="india" checked>
+                                            <span class="checkbox-indicator"></span>
+                                            <span class="checkbox-text">India (NSE, BSE)</span>
+                                        </label>
+                                        
+                                        <label class="neo-checkbox">
+                                            <input type="checkbox" name="markets[]" value="europe" checked>
+                                            <span class="checkbox-indicator"></span>
+                                            <span class="checkbox-text">Europe (LSE, XETRA)</span>
+                                        </label>
+                                        
+                                        <label class="neo-checkbox">
+                                            <input type="checkbox" name="markets[]" value="asia" checked>
+                                            <span class="checkbox-indicator"></span>
+                                            <span class="checkbox-text">Asia (TSE, SSE, HKEX)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="filter-section">
+                                    <h3>Asset Type</h3>
+                                    <div class="filter-options">
+                                        <label class="neo-checkbox">
+                                            <input type="checkbox" name="asset_types[]" value="stock" checked>
+                                            <span class="checkbox-indicator"></span>
+                                            <span class="checkbox-text">Stocks</span>
+                                        </label>
+                                        
+                                        <label class="neo-checkbox">
+                                            <input type="checkbox" name="asset_types[]" value="etf" checked>
+                                            <span class="checkbox-indicator"></span>
+                                            <span class="checkbox-text">ETFs</span>
+                                        </label>
+                                        
+                                        <label class="neo-checkbox">
+                                            <input type="checkbox" name="asset_types[]" value="crypto">
+                                            <span class="checkbox-indicator"></span>
+                                            <span class="checkbox-text">Crypto</span>
+                                        </label>
+                                        
+                                        <label class="neo-checkbox">
+                                            <input type="checkbox" name="asset_types[]" value="index">
+                                            <span class="checkbox-indicator"></span>
+                                            <span class="checkbox-text">Indices</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                {% if error %}
+                <div class="error-container">
+                    <div class="error-icon"></div>
+                    <h3>Neural Error Detected</h3>
+                    <p>{{ error }}</p>
+                </div>
+                {% elif results %}
+                <div class="results-container">
+                    <div class="panel results-panel">
+                        <div class="panel-header">
+                            <h2>Search Results</h2>
+                            <div class="results-count">{{ results|length }} assets found</div>
+                        </div>
+                        
+                        <div class="panel-body">
+                            <div class="results-grid">
+                                {% for company in results %}
+                                <div class="company-card">
+                                    <div class="company-header">
+                                        <div class="company-logo-container">
+                                            {% if company.logo %}
+                                            <img src="{{ company.logo }}" alt="{{ company.name }}" class="company-logo">
+                                            {% else %}
+                                            <div class="company-logo-placeholder">{{ company.ticker[0] }}</div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="company-title">
+                                            <h3>{{ company.name }}</h3>
+                                            <div class="company-meta">
+                                                <div class="ticker-badge">{{ company.ticker }}</div>
+                                                <div class="exchange-badge">{{ company.exchange }}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="company-price">${{ "%.2f"|format(company.current_price) }}</div>
+                                    </div>
+                                    
+                                    <div class="company-body">
+                                        <div class="company-metrics">
+                                            <div class="metric">
+                                                <div class="metric-label">Market Cap</div>
+                                                <div class="metric-value">${{ "%.2f"|format(company.market_cap/1000000000) }}B</div>
+                                            </div>
+                                            
+                                            <div class="metric">
+                                                <div class="metric-label">P/E Ratio</div>
+                                                <div class="metric-value">{{ "%.2f"|format(company.pe_ratio) if company.pe_ratio else 'N/A' }}</div>
+                                            </div>
+                                            
+                                            <div class="metric">
+                                                <div class="metric-label">52W Range</div>
+                                                <div class="metric-value">{{ "%.2f"|format(company['52w_low']) }} - {{ "%.2f"|format(company['52w_high']) }}</div>
+                                            </div>
+                                            
+                                            <div class="metric">
+                                                <div class="metric-label">Dividend</div>
+                                                <div class="metric-value">{{ "%.2f"|format(company.dividend_yield) }}%</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="company-description">
+                                            {{ company.description|truncate(100) }}
+                                        </div>
+                                        
+                                        <div class="company-actions">
+                                            <a href="{{ url_for('price_predictor', ticker=company.ticker) }}" class="neo-button small">
+                                                <span class="button-icon prediction-icon"></span>
+                                                <span>Predict</span>
+                                            </a>
+                                            
+                                            <a href="{{ url_for('sentiment_analyzer', ticker=company.ticker) }}" class="neo-button small">
+                                                <span class="button-icon sentiment-icon"></span>
+                                                <span>Sentiment</span>
+                                            </a>
+                                            
+                                            <a href="{{ url_for('company_profile', ticker=company.ticker) }}" class="neo-button small outline">
+                                                <span class="button-icon profile-icon"></span>
+                                                <span>Profile</span>
+                                            </a>
+                                            
+                                            {% if session.get('user_id') %}
+                                            <button class="neo-button small outline favorite-btn" data-ticker="{{ company.ticker }}">
+                                                <span class="button-icon favorite-icon"></span>
+                                                <span>Favorite</span>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="market-shortcuts">
+                    <h2 class="section-title">Popular Markets</h2>
+                    
+                    <div class="market-tabs">
+                        <button class="market-tab active" data-market="us">US Markets</button>
+                        <button class="market-tab" data-market="india">India Markets</button>
+                        <button class="market-tab" data-market="europe">Europe Markets</button>
+                        <button class="market-tab" data-market="asia">Asia Markets</button>
+                        <button class="market-tab" data-market="crypto">Crypto</button>
+                    </div>
+                    
+                    <div class="market-content active" id="us-market">
+                        <div class="market-section">
+                            <h3>US Tech Giants</h3>
+                            <div class="ticker-grid">
+                                <div class="ticker-item" data-ticker="AAPL">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/apple.com" alt="Apple">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Apple Inc.</div>
+                                        <div class="ticker-symbol">AAPL</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="AAPL">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="MSFT">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/microsoft.com" alt="Microsoft">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Microsoft Corp.</div>
+                                        <div class="ticker-symbol">MSFT</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="MSFT">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="GOOGL">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/google.com" alt="Alphabet">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Alphabet Inc.</div>
+                                        <div class="ticker-symbol">GOOGL</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="GOOGL">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="META">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/meta.com" alt="Meta">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Meta Platforms</div>
+                                        <div class="ticker-symbol">META</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="META">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="AMZN">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/amazon.com" alt="Amazon">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Amazon.com Inc.</div>
+                                        <div class="ticker-symbol">AMZN</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="AMZN">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="NFLX">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/netflix.com" alt="Netflix">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Netflix Inc.</div>
+                                        <div class="ticker-symbol">NFLX</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="NFLX">Use</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="market-section">
+                            <h3>US Market Indices</h3>
+                            <div class="ticker-grid">
+                                <div class="ticker-item" data-ticker="^GSPC">
+                                    <div class="ticker-logo index">S&P</div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">S&P 500 Index</div>
+                                        <div class="ticker-symbol">^GSPC</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="^GSPC">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="^DJI">
+                                    <div class="ticker-logo index">DOW</div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Dow Jones Industrial</div>
+                                        <div class="ticker-symbol">^DJI</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="^DJI">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="^IXIC">
+                                    <div class="ticker-logo index">NAS</div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">NASDAQ Composite</div>
+                                        <div class="ticker-symbol">^IXIC</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="^IXIC">Use</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="market-content" id="india-market">
+                        <div class="market-section">
+                            <h3>India Top Companies</h3>
+                            <div class="ticker-grid">
+                                <div class="ticker-item" data-ticker="RELIANCE.NS">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/ril.com" alt="Reliance">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Reliance Industries</div>
+                                        <div class="ticker-symbol">RELIANCE.NS</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="RELIANCE.NS">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="TCS.NS">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/tcs.com" alt="TCS">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Tata Consultancy Services</div>
+                                        <div class="ticker-symbol">TCS.NS</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="TCS.NS">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="INFY.NS">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/infosys.com" alt="Infosys">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Infosys Ltd.</div>
+                                        <div class="ticker-symbol">INFY.NS</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="INFY.NS">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="HDFCBANK.NS">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/hdfcbank.com" alt="HDFC Bank">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">HDFC Bank Ltd.</div>
+                                        <div class="ticker-symbol">HDFCBANK.NS</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="HDFCBANK.NS">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="BHARTIARTL.NS">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/airtel.in" alt="Bharti Airtel">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Bharti Airtel Ltd.</div>
+                                        <div class="ticker-symbol">BHARTIARTL.NS</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="BHARTIARTL.NS">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="TATAMOTORS.NS">
+                                    <div class="ticker-logo">
+                                        <img src="https://logo.clearbit.com/tatamotors.com" alt="Tata Motors">
+                                    </div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">Tata Motors Ltd.</div>
+                                        <div class="ticker-symbol">TATAMOTORS.NS</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="TATAMOTORS.NS">Use</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="market-section">
+                            <h3>India Market Indices</h3>
+                            <div class="ticker-grid">
+                                <div class="ticker-item" data-ticker="^NSEI">
+                                    <div class="ticker-logo index">NSE</div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">NIFTY 50</div>
+                                        <div class="ticker-symbol">^NSEI</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="^NSEI">Use</button>
+                                </div>
+                                
+                                <div class="ticker-item" data-ticker="^BSESN">
+                                    <div class="ticker-logo index">BSE</div>
+                                    <div class="ticker-info">
+                                        <div class="ticker-name">S&P BSE SENSEX</div>
+                                        <div class="ticker-symbol">^BSESN</div>
+                                    </div>
+                                    <button class="ticker-use-btn" data-ticker="^BSESN">Use</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="market-content" id="europe-market">
+                        <!-- Europe market content here -->
+                    </div>
+                    
+                    <div class="market-content" id="asia-market">
+                        <!-- Asia market content here -->
+                    </div>
+                    
+                    <div class="market-content" id="crypto-market">
+                        <!-- Crypto market content here -->
+                    </div>
+                </div>
+                
+                <div class="exchange-guide">
+                    <h2 class="section-title">Global Exchange Ticker Guide</h2>
+                    
+                    <div class="guide-content">
+                        <p>When searching for global stocks, use the appropriate exchange suffix after the ticker:</p>
+                        
+                        <div class="guide-grid">
+                            <div class="guide-item">
+                                <h3>US Markets</h3>
+                                <p>No suffix needed for NYSE/NASDAQ</p>
+                                <div class="example">Example: <code>AAPL</code>, <code>MSFT</code></div>
+                            </div>
+                            
+                            <div class="guide-item">
+                                <h3>India Markets</h3>
+                                <p>Use .NS for NSE, .BO for BSE</p>
+                                <div class="example">Example: <code>RELIANCE.NS</code>, <code>TCS.BO</code></div>
+                            </div>
+                            
+                            <div class="guide-item">
+                                <h3>UK Markets</h3>
+                                <p>Use .L for London Stock Exchange</p>
+                                <div class="example">Example: <code>BP.L</code>, <code>HSBA.L</code></div>
+                            </div>
+                            
+                            <div class="guide-item">
+                                <h3>European Markets</h3>
+                                <p>Use .DE (Germany), .PA (Paris), etc.</p>
+                                <div class="example">Example: <code>BMW.DE</code>, <code>AIR.PA</code></div>
+                            </div>
+                            
+                            <div class="guide-item">
+                                <h3>Asia Markets</h3>
+                                <p>Use .T (Tokyo), .HK (Hong Kong), etc.</p>
+                                <div class="example">Example: <code>7203.T</code>, <code>0700.HK</code></div>
+                            </div>
+                            
+                            <div class="guide-item">
+                                <h3>Cryptocurrency</h3>
+                                <p>Use -USD suffix</p>
+                                <div class="example">Example: <code>BTC-USD</code>, <code>ETH-USD</code></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Cosmic Finance. All neural pathways reserved.</p>
+                <div class="system-time">{{ current_date }}</div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/galaxy-background.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ticker-search.js') }}"></script>
+</body>
+</html>
