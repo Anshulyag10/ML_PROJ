@@ -32,6 +32,23 @@ from flask_mail import Mail, Message
 from dotenv import load_dotenv
 load_dotenv()       # loads .env into os.environ
 
+import logging
+from concurrent_log_handler import ConcurrentRotatingFileHandler  # <-- NEW import
+import os
+
+import datetime as dt
+import pandas as pd
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, LSTM, Dropout, Input
+from sklearn.metrics import mean_absolute_error, r2_score
+import random
+import io
+import base64
+import yfinance as yf
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -47,9 +64,6 @@ app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER') or 'noreply@cosmicfinance.ai'
 
-import logging
-from concurrent_log_handler import ConcurrentRotatingFileHandler  # <-- NEW import
-import os
 
 # Create 'logs' directory if it doesn't exist
 if not os.path.exists('logs'):
@@ -205,282 +219,154 @@ def login_required(f):
 # Portfolio Optimizer Class
 # -------------------------------
 
-import numpy as np
-import pandas as pd
-import datetime as dt
-import yfinance as yf
-from scipy.optimize import minimize, basinhopping
-from sklearn.covariance import LedoitWolf
-from collections import defaultdict
-
 class PortfolioOptimizer:
-    def _init_(self):
-        self.TRANSACTION_COST = 0.001  # 0.1%
-        self.MAX_SECTOR_EXPOSURE = 0.3  # 30% per sector
-        self.REBALANCE_THRESHOLD = 0.05  # 5% threshold for rebalancing
-        self.MAX_ASSETS = 10  # Cardinality constraint
+    def __init__(self):
+        pass
         
-    def _get_risk_free_rate(self):
-        """Fetch current risk-free rate or use fallback"""
+    def optimize_portfolio(self, tickers, risk_preference='moderate'):
+        """Optimize a portfolio of assets based on historical data"""
         try:
-            treasury_data = yf.download('^IRX', period='1d')['Close'].iloc[-1]
-            return treasury_data / 100 / 252  # Convert annual percentage to daily decimal
-        except Exception as e:
-            print(f"Couldn't fetch risk-free rate: {e}. Using fallback 2%")
-            return 0.02 / 252
-
-    def _preprocess_tickers(self, tickers):
-        """Validate and preprocess ticker list"""
-        if not tickers or len(tickers) == 0:
-            raise ValueError("No tickers provided for optimization")
+            # Get historical data for tickers
+            end_date = dt.date.today()
+            start_date = end_date - dt.timedelta(days=365 * 3) # 3 years of data
             
-        tickers = [t.upper().strip() for t in tickers if isinstance(t, str) and len(t.strip()) > 0]
-        if len(tickers) != len(set(tickers)):
-            raise ValueError("Duplicate tickers found in input")
+            app.logger.info(f"Optimizing portfolio for tickers: {tickers} with risk preference: {risk_preference}")
             
-        return tickers
-
-    def _get_historical_data(self, tickers, years=3):
-        """Fetch and validate historical price data"""
-        end_date = dt.date.today()
-        start_date = end_date - dt.timedelta(days=365 * years)
-        
-        data = yf.download(tickers, start=start_date, end=end_date, group_by='ticker')
-        
-        if data.empty:
-            raise ValueError("No data found for the given tickers")
+            # Download data
+            data = yf.download(tickers, start=start_date, end=end_date)
             
-        # Handle single ticker case
-        if len(tickers) == 1:
-            if 'Adj Close' not in data.columns:
-                raise ValueError(f"Could not find price data for {tickers[0]}")
-            price_data = pd.DataFrame(data['Adj Close'], columns=tickers)
-        else:
-            # Multi-ticker case
-            price_data = pd.DataFrame()
-            for t in tickers:
-                if t in data and 'Adj Close' in data[t]:
-                    price_data[t] = data[t]['Adj Close']
+            # Check if we have data
+            if data.empty:
+                app.logger.error("No data found for the given tickers")
+                return None
+                
+            # Determine which price column to use - handle different data structures
+            price_data = None
+            
+            # Check if we have multi-level columns (multiple tickers)
+            if isinstance(data.columns, pd.MultiIndex):
+                # For multiple tickers, we'll have columns like ('Adj Close', 'AAPL')
+                if 'Adj Close' in data.columns.levels[0]:
+                    price_data = data['Adj Close']
+                elif 'Close' in data.columns.levels[0]:
+                    price_data = data['Close']
                 else:
-                    print(f"Warning: No data for ticker {t}, skipping")
-            
-            if price_data.empty:
-                raise ValueError("No valid price data found for any ticker")
+                    error_msg = "Could not find price data columns in multi-ticker data"
+                    app.logger.error(error_msg)
+                    raise Exception(error_msg)
+            else:
+                # For single ticker, columns are simple strings
+                if 'Adj Close' in data.columns:
+                    price_data = data[['Adj Close']]
+                elif 'Close' in data.columns:
+                    price_data = data[['Close']]
+                else:
+                    error_msg = "Could not find price data columns in single-ticker data"
+                    app.logger.error(error_msg)
+                    raise Exception(error_msg)
+                    
+            # If only one ticker, ensure data is in the right format
+            if len(tickers) == 1 and not isinstance(price_data, pd.DataFrame):
+                price_data = pd.DataFrame(price_data, columns=tickers)
                 
-        return price_data.dropna()
-
-    def _calculate_returns(self, price_data):
-        """Calculate log returns with validation"""
-        returns = np.log(price_data / price_data.shift(1)).dropna()
-        
-        if returns.isnull().values.any():
-            raise ValueError("Invalid returns calculation - contains NaN values")
+            # Calculate returns
+            returns = price_data.pct_change().dropna()
             
-        return returns
-
-    def _optimize_with_retries(self, objective, initial_weights, bounds, constraints):
-        """Robust optimization with multiple attempts"""
-        try:
-            # First try standard optimization
-            result = minimize(objective, initial_weights, method='SLSQP',
-                            bounds=bounds, constraints=constraints)
-            
-            if not result.success:
-                # Try with basinhopping for global optimization
-                minimizer_kwargs = {
-                    'method': 'SLSQP',
-                    'bounds': bounds,
-                    'constraints': constraints
-                }
-                result = basinhopping(objective, initial_weights,
-                                    minimizer_kwargs=minimizer_kwargs,
-                                    niter=10, stepsize=0.1)
-            
-            return result if result.success else None
-        except Exception as e:
-            print(f"Optimization failed: {e}")
-            return None
-
-    def _get_sector_constraints(self, tickers, sector_data, weights):
-        """Generate sector exposure constraints"""
-        constraints = []
-        sector_exposures = defaultdict(float)
-        
-        if sector_data:
-            for i, ticker in enumerate(tickers):
-                if ticker in sector_data:
-                    sector = sector_data[ticker]
-                    sector_exposures[sector] += weights[i]
-            
-            for sector, exposure in sector_exposures.items():
-                if exposure > self.MAX_SECTOR_EXPOSURE:
-                    indices = [i for i, t in enumerate(tickers) 
-                              if sector_data.get(t) == sector]
-                    constraints.append({
-                        'type': 'ineq',
-                        'fun': lambda x, idx=indices: self.MAX_SECTOR_EXPOSURE - np.sum(x[idx])
-                    })
-        
-        return constraints
-
-    def optimize_portfolio(self, tickers, risk_preference='moderate', 
-                         sector_data=None, prev_weights=None, views=None):
-        """Enhanced portfolio optimization with multiple improvements"""
-        try:
-            # 1. Input validation and preprocessing
-            tickers = self._preprocess_tickers(tickers)
-            risk_free_rate = self._get_risk_free_rate()
-            
-            # 2. Data acquisition and processing
-            price_data = self._get_historical_data(tickers)
-            returns = self._calculate_returns(price_data)
+            # Calculate mean returns and covariance matrix
             mean_returns = returns.mean()
+            cov_matrix = returns.cov()
             
-            # 3. Enhanced covariance matrix estimation
-            cov_matrix = LedoitWolf().fit(returns).covariance_
+            app.logger.info(f"Portfolio contains {len(tickers)} assets")
             
-            # 4. Incorporate views using Black-Litterman if provided
-            if views is not None and len(views) == len(tickers):
-                tau = 0.05
-                P = np.eye(len(mean_returns))
-                Omega = np.diag([0.1]*len(views))  # Default confidence
-                
-                risk_aversion = (mean_returns.mean() - risk_free_rate) / cov_matrix.mean()
-                implied_returns = risk_aversion * np.dot(cov_matrix, np.ones(len(mean_returns)))
-                
-                combined_returns = np.linalg.inv(np.linalg.inv(tau * cov_matrix) + P.T @ np.linalg.inv(Omega) @ P)
-                combined_returns = combined_returns @ (np.linalg.inv(tau * cov_matrix) @ implied_returns + P.T @ np.linalg.inv(Omega) @ views)
-                mean_returns = pd.Series(combined_returns, index=mean_returns.index)
+            # Set risk-free rate (typically treasury yield)
+            risk_free_rate = 0.02/252  # Assuming 2% annual risk-free rate, converted to daily
             
-            # 5. Define objective function based on risk preference
-            def objective(weights):
-                portfolio_return = np.sum(mean_returns * weights) * 252
-                portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
+            # Define the objective function based on risk preference
+            if risk_preference.lower() == 'low':
+                # Conservative - Minimize volatility with a minimum return constraint
+                min_return = np.min(mean_returns) * 252  # Minimum acceptable return
                 
-                # Transaction cost penalty if previous weights provided
-                if prev_weights is not None:
-                    turnover = np.sum(np.abs(weights - prev_weights))
-                    portfolio_return -= turnover * self.TRANSACTION_COST
-                
-                # Cardinality constraint penalty
-                num_assets = np.sum(weights > 0.01)
-                cardinality_penalty = 0.01 * max(0, num_assets - self.MAX_ASSETS)
-                
-                if risk_preference.lower() == 'low':
-                    min_return = np.min(mean_returns) * 252
+                def objective(weights):
+                    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
+                    portfolio_return = np.sum(mean_returns * weights) * 252
+                    
+                    # Penalty if return is below minimum
                     return_penalty = max(0, min_return - portfolio_return) * 100
-                    return portfolio_volatility + return_penalty + cardinality_penalty
-                elif risk_preference.lower() == 'high':
-                    return -portfolio_return + 0.5 * portfolio_volatility + cardinality_penalty
-                else:  # moderate
+                    
+                    return portfolio_volatility + return_penalty
+                    
+            elif risk_preference.lower() == 'high':
+                # Aggressive - Maximize return with a volatility constraint
+                def objective(weights):
+                    portfolio_return = np.sum(mean_returns * weights) * 252
+                    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
+                    
+                    # High risk tolerance - heavily weight return maximization
+                    return -portfolio_return + 0.5 * portfolio_volatility
+                    
+            else:  # 'moderate'
+                # Balanced - Maximize Sharpe ratio
+                def objective(weights):
+                    portfolio_return = np.sum(mean_returns * weights) * 252
+                    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
+                    
+                    # Sharpe ratio: (return - risk_free_rate) / volatility
                     sharpe_ratio = (portfolio_return - risk_free_rate * 252) / portfolio_volatility
-                    return -sharpe_ratio + cardinality_penalty
+                    
+                    # We're minimizing, so negate
+                    return -sharpe_ratio
             
-            # 6. Set up constraints
-            constraints = [{'type': 'eq', 'fun': lambda x: np.sum(x) - 1}]
+            # Constraints: weights sum to 1 and each weight >= 0
+            constraints = {'type': 'eq', 'fun': lambda x: np.sum(x) - 1}
             bounds = tuple((0, 1) for _ in range(len(tickers)))
             
-            # Add sector constraints if sector data provided
+            # Initial guess (equal weights)
             initial_weights = np.array([1.0/len(tickers)] * len(tickers))
-            sector_constraints = self._get_sector_constraints(tickers, sector_data, initial_weights)
-            constraints.extend(sector_constraints)
             
-            # 7. Perform optimization
-            result = self._optimize_with_retries(objective, initial_weights, bounds, constraints)
+            # Perform optimization
+            result = minimize(objective, initial_weights, method='SLSQP', bounds=bounds, constraints=constraints)
             
-            if result is None:
-                print("Optimization failed, using equal weights as fallback")
+            if not result['success']:
+                app.logger.warning(f"Optimization failed: {result.get('message', 'Unknown error')}. Using equal weights.")
                 weights = initial_weights
             else:
-                weights = result.x
-                weights[weights < 0.01] = 0  # Remove negligible weights
-                weights /= np.sum(weights)  # Re-normalize
+                weights = result['x']
+                app.logger.info(f"Optimization successful")
             
-            # 8. Calculate portfolio metrics
+            # Calculate portfolio metrics
             portfolio_return = np.sum(mean_returns * weights) * 252
             portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
             sharpe_ratio = (portfolio_return - risk_free_rate * 252) / portfolio_volatility
             
-            # 9. Prepare results
+            # Prepare portfolio data
             portfolio_data = []
             for i, ticker in enumerate(tickers):
-                if weights[i] > 0.001:  # Only include assets with >0.1% allocation
-                    portfolio_data.append({
-                        'ticker': ticker,
-                        'weight': weights[i] * 100,
-                        'expected_return': mean_returns.iloc[i] * 252 * 100,
-                        'volatility': np.sqrt(cov_matrix[i,i]) * np.sqrt(252) * 100,
-                        'sector': sector_data.get(ticker, 'Unknown') if sector_data else None
-                    })
-            
+                portfolio_data.append({
+                    'ticker': ticker,
+                    'weight': weights[i] * 100, # Convert to percentage
+                    'expected_return': mean_returns.iloc[i] * 252 * 100 if isinstance(mean_returns, pd.Series) else mean_returns[i] * 252 * 100, # Annualized percentage
+                    'volatility': np.sqrt(cov_matrix.iloc[i, i] if isinstance(cov_matrix, pd.DataFrame) else cov_matrix[i, i]) * np.sqrt(252) * 100 # Annualized percentage
+                })
+                
+            # Sort by weight, descending
             portfolio_data.sort(key=lambda x: x['weight'], reverse=True)
             
-            # 10. Calculate rebalancing needs if previous weights provided
-            rebalancing = {}
-            if prev_weights is not None and len(prev_weights) == len(tickers):
-                for i, ticker in enumerate(tickers):
-                    change = weights[i] - prev_weights[i]
-                    if abs(change) > self.REBALANCE_THRESHOLD:
-                        rebalancing[ticker] = {
-                            'current': prev_weights[i] * 100,
-                            'target': weights[i] * 100,
-                            'change': change * 100
-                        }
+            # Log the results
+            app.logger.info(f"Portfolio return: {portfolio_return * 100:.2f}%, Portfolio volatility: {portfolio_volatility * 100:.2f}%, Sharpe ratio: {sharpe_ratio:.2f}")
             
+            # Return results
             return {
-                'optimized_weights': {d['ticker']: d['weight'] for d in portfolio_data},
-                'portfolio_metrics': {
-                    'expected_return': portfolio_return * 100,
-                    'volatility': portfolio_volatility * 100,
-                    'sharpe_ratio': sharpe_ratio,
-                    'risk_free_rate': risk_free_rate * 252 * 100
-                },
-                'asset_details': portfolio_data,
-                'rebalancing': rebalancing,
-                'risk_preference': risk_preference,
-                'success': result is not None
+                'portfolio_data': portfolio_data,
+                'portfolio_return': portfolio_return * 100, # Convert to percentage
+                'portfolio_volatility': portfolio_volatility * 100, # Convert to percentage
+                'sharpe_ratio': sharpe_ratio,
+                'risk_preference': risk_preference
             }
             
         except Exception as e:
-            print(f"Portfolio optimization failed: {str(e)}")
-            return {
-                'error': str(e),
-                'success': False
-            }
-
-    def monte_carlo_simulation(self, tickers, n_simulations=10000):
-        """Run Monte Carlo simulation for efficient frontier visualization"""
-        try:
-            tickers = self._preprocess_tickers(tickers)
-            price_data = self._get_historical_data(tickers)
-            returns = self._calculate_returns(price_data)
-            mean_returns = returns.mean()
-            cov_matrix = LedoitWolf().fit(returns).covariance_
-            
-            results = np.zeros((3, n_simulations))
-            
-            for i in range(n_simulations):
-                weights = np.random.random(len(tickers))
-                weights /= np.sum(weights)
-                
-                portfolio_return = np.sum(mean_returns * weights) * 252
-                portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
-                
-                results[0,i] = portfolio_return
-                results[1,i] = portfolio_volatility
-                results[2,i] = (portfolio_return - self._get_risk_free_rate() * 252) / portfolio_volatility
-            
-            return {
-                'returns': results[0],
-                'volatility': results[1],
-                'sharpe': results[2],
-                'success': True
-            }
-        except Exception as e:
-            return {
-                'error': str(e),
-                'success': False
-                }
+            error_msg = f"Portfolio optimization error: {str(e)}"
+            app.logger.error(error_msg, exc_info=True)
+            raise Exception(error_msg)
 
 # -------------------------------
 # Helper Functions for Stock Prediction
@@ -1287,119 +1173,11 @@ def index():
 
 @app.route("/price_predictor", methods=["GET", "POST"])
 def price_predictor():
-    """Price prediction page using stock data from multiple sources with improved LSTM model"""
-    import datetime as dt
-    import pandas as pd
-    import numpy as np
-    import os
-    import requests
-    import json
-    from datetime import datetime, timedelta
-    # Set non-interactive backend before importing pyplot
-    import matplotlib
-    matplotlib.use('Agg')  # Fixes the "main thread is not in main loop" error
-    import matplotlib.pyplot as plt
-    from sklearn.preprocessing import MinMaxScaler
-    from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import Dense, LSTM, Dropout, Input
-    from sklearn.metrics import mean_absolute_error, r2_score
-    import random
-    import io
-    import base64
-    import yfinance as yf
+    """Price prediction page using Yahoo Finance data with improved LSTM model"""
     
-    # Get API keys from environment variables
-    ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY')
-    FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY')
 
-    # Function to fetch data from Finnhub API
-    def fetch_from_finnhub(ticker, start_date, end_date):
-        """Fetch historical stock data from Finnhub API"""
-        try:
-            # Convert dates to UNIX timestamps
-            start_timestamp = int(datetime.strptime(str(start_date), "%Y-%m-%d").timestamp())
-            end_timestamp = int(datetime.strptime(str(end_date), "%Y-%m-%d").timestamp())
-            
-            # Construct the API URL
-            base_url = "https://finnhub.io/api/v1"
-            endpoint = "/stock/candle"
-            query = f"?symbol={ticker}&resolution=D&from={start_timestamp}&to={end_timestamp}&token={FINNHUB_API_KEY}"
-            
-            # Make the API request
-            response = requests.get(base_url + endpoint + query)
-            data = response.json()
-            
-            # Check if the response is valid
-            if 'error' in data or data.get('s') != 'ok':
-                print(f"Finnhub error: {data.get('error', 'Unknown error')}")
-                return None
-            
-            # Create DataFrame from the response
-            df = pd.DataFrame({
-                'Date': pd.to_datetime([datetime.fromtimestamp(t) for t in data['t']]),
-                'Close': data['c'],
-                'Open': data['o'],
-                'High': data['h'],
-                'Low': data['l'],
-                'Volume': data['v']
-            })
-            
-            # Set Date as index
-            df.set_index('Date', inplace=True)
-            
-            return df
-        except Exception as e:
-            print(f"Error fetching data from Finnhub: {str(e)}")
-            return None
-
-    # Function to fetch data from Alpha Vantage API
-    def fetch_from_alpha_vantage(ticker, start_date, end_date):
-        """Fetch historical stock data from Alpha Vantage API"""
-        try:
-            # Construct the API URL
-            base_url = "https://www.alphavantage.co/query"
-            params = {
-                'function': 'TIME_SERIES_DAILY_ADJUSTED',
-                'symbol': ticker,
-                'outputsize': 'full',
-                'apikey': ALPHA_VANTAGE_API_KEY
-            }
-            
-            # Make the API request
-            response = requests.get(base_url, params=params)
-            data = response.json()
-            
-            # Check if the response is valid
-            if 'Error Message' in data or 'Time Series (Daily)' not in data:
-                print(f"Alpha Vantage error: {data.get('Error Message', 'Unknown error')}")
-                return None
-            
-            # Extract time series data
-            time_series = data['Time Series (Daily)']
-            
-            # Convert to DataFrame
-            df = pd.DataFrame.from_dict(time_series, orient='index')
-            
-            # Rename columns
-            df.columns = ['Open', 'High', 'Low', 'Close', 'Adjusted Close', 'Volume', 'Dividend Amount', 'Split Coefficient']
-            
-            # Convert data types
-            for col in df.columns:
-                df[col] = pd.to_numeric(df[col])
-            
-            # Use adjusted close as close
-            df['Close'] = df['Adjusted Close']
-            
-            # Convert index to datetime
-            df.index = pd.to_datetime(df.index)
-            
-            # Filter the data based on date range
-            df = df[(df.index >= pd.to_datetime(start_date)) & (df.index <= pd.to_datetime(end_date))]
-            
-            return df
-        except Exception as e:
-            print(f"Error fetching data from Alpha Vantage: {str(e)}")
-            return None
+    # Set non-interactive backend before importing pyplot
+    matplotlib.use('Agg')  # Fixes the "main thread is not in main loop" error
 
     # Helper function to create sequences
     def create_sequences(data, time_step):
@@ -1433,6 +1211,7 @@ def price_predictor():
         plt.figure(figsize=(10, 6))
         metrics_keys = list(metrics.keys())
         metrics_values = [float(metrics[key].replace('%', '')) if '%' in metrics[key] else float(metrics[key]) for key in metrics_keys]
+        
         bars = plt.bar(metrics_keys, metrics_values, color=['skyblue', 'lightgreen', 'salmon'])
         
         for bar, value in zip(bars, metrics.values()):
@@ -1474,15 +1253,12 @@ def price_predictor():
         future_date = (request.form.get("future_date") if request.method == "POST" else None) \
                          or (today + dt.timedelta(days=30)).isoformat()
 
-        # ----- Fetch data with fallback strategy -----
-        start_date = today - dt.timedelta(days=500)  # Get 500 days of data
-        end_date = today
-        
-        df = None
-        data_source = None
-        
-        # Try yfinance first
+        # ----- Fetch data from Yahoo Finance -----
         try:
+            # Use yfinance to get stock data - fetch more data to avoid insufficiency
+            start_date = today - dt.timedelta(days=500)  # Get 500 days of data
+            end_date = today
+            
             # Try different ticker formats for international stocks
             yf_tickers = [ticker]
             # If it seems like a non-US stock without market identifier, try common suffixes
@@ -1490,49 +1266,31 @@ def price_predictor():
                 # Add common international exchange suffixes
                 yf_tickers.extend([f"{ticker}.NS", f"{ticker}.BO", f"{ticker}.L", f"{ticker}.TO"])
             
+            # Try each ticker format
+            df = None
             successful_ticker = None
+            
             for yf_ticker in yf_tickers:
                 try:
+                    # Use multi_level_index=False to avoid the multi-index issue
                     df_tmp = yf.download(yf_ticker, start=start_date, end=end_date, progress=False, multi_level_index=False)
                     if not df_tmp.empty and len(df_tmp) > 60:  # Ensure we have enough data
                         df = pd.DataFrame(df_tmp['Close'])
                         successful_ticker = yf_ticker
-                        data_source = f"Yahoo Finance (as {successful_ticker})"
                         break
                 except Exception:
                     continue
-        except Exception as e:
-            print(f"YFinance error: {str(e)}")
             
-        # Try Finnhub if yfinance failed
-        if df is None or df.empty:
-            print("Trying Finnhub API...")
-            try:
-                if FINNHUB_API_KEY:
-                    finnhub_df = fetch_from_finnhub(ticker, start_date, end_date)
-                    if finnhub_df is not None and not finnhub_df.empty and len(finnhub_df) > 60:
-                        df = pd.DataFrame(finnhub_df['Close'])
-                        data_source = f"Finnhub API ({ticker})"
-            except Exception as e:
-                print(f"Finnhub error: {str(e)}")
-        
-        # Try Alpha Vantage if both yfinance and Finnhub failed
-        if df is None or df.empty:
-            print("Trying Alpha Vantage API...")
-            try:
-                if ALPHA_VANTAGE_API_KEY:
-                    av_df = fetch_from_alpha_vantage(ticker, start_date, end_date)
-                    if av_df is not None and not av_df.empty and len(av_df) > 60:
-                        df = pd.DataFrame(av_df['Close'])
-                        data_source = f"Alpha Vantage API ({ticker})"
-            except Exception as e:
-                print(f"Alpha Vantage error: {str(e)}")
-        
-        # If all data sources failed
-        if df is None or df.empty:
+            if df is None or df.empty:
+                raise ValueError(f"No data available for ticker {ticker} or its variations")
+            
+            # Data source info for display
+            data_source = f"Yahoo Finance (as {successful_ticker})"
+                
+        except Exception as e:
             return render_template(
                 "price_predictor.html",
-                error=f"Failed to retrieve data for {ticker} from all available sources.",
+                error=f"Failed to retrieve data from Yahoo Finance: {str(e)}",
                 current_date=current_date,
                 today=today
             )
@@ -1979,10 +1737,10 @@ def compare():
             
             for ticker in tickers:
                 try:
-                    # Download data for this single ticker
-                    df = yf.download(ticker, start=start_date, end=end_date)
+                    # Download data for this single ticker - specify auto_adjust=True explicitly
+                    df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True)
                     
-                    if df.empty or len(df) < 5: # Require at least 5 data points
+                    if df.empty or len(df) < 5:  # Require at least 5 data points
                         continue
                         
                     # Ensure 'Close' column exists
@@ -1992,12 +1750,36 @@ def compare():
                     # Convert index to string dates for JSON serialization
                     dates = df.index.strftime('%Y-%m-%d').tolist()
                     
+                    # Get close prices as individual scalars, not arrays
+                    close_prices = []
+                    for idx in range(len(df)):
+                        close_prices.append(float(df['Close'].iloc[idx]))
+                    
+                    # Calculate returns from close prices 
+                    returns = []
+                    for i in range(len(close_prices)):
+                        if i == 0:
+                            returns.append(0.0)  # First return is 0
+                        else:
+                            prev_price = close_prices[i-1]
+                            if prev_price > 0:
+                                ret = (close_prices[i] / prev_price) - 1
+                                returns.append(float(ret))
+                            else:
+                                returns.append(0.0)
+                    
+                    # Get volume data similarly
+                    volume = []
+                    if 'Volume' in df.columns:
+                        for idx in range(len(df)):
+                            volume.append(float(df['Volume'].iloc[idx]))
+                    
                     # Store data as simple lists to avoid dimensionality issues
                     tickers_data[ticker] = {
                         'dates': dates,
-                        'prices': df['Close'].values.tolist(),
-                        'returns': df['Close'].pct_change().fillna(0).values.tolist(),
-                        'volume': df['Volume'].values.tolist() if 'Volume' in df.columns else []
+                        'prices': close_prices,
+                        'returns': returns,
+                        'volume': volume
                     }
                     
                     # Get company profile for additional context
@@ -2012,7 +1794,7 @@ def compare():
                             'exchange': 'Unknown',
                             'industry': 'Unknown',
                             'market_cap': 0,
-                            'current_price': df['Close'].iloc[-1] if not df.empty else 0
+                            'current_price': float(df['Close'].iloc[-1]) if not df.empty else 0
                         }
                         
                 except Exception as e:
@@ -2030,20 +1812,36 @@ def compare():
                 price_chart = None
                 
             # Calculate correlation matrix - ensure data is properly aligned
-            correlation_matrix = [[1.0 for _ in tickers_data] for _ in tickers_data] # Default to 1.0 (perfect correlation)
+            ticker_list = list(tickers_data.keys())
+            correlation_matrix = [[1.0 for _ in ticker_list] for _ in ticker_list]  # Default to 1.0 (perfect correlation)
             
             try:
-                # Create a DataFrame of returns
-                all_returns = pd.DataFrame()
+                # Create a DataFrame with aligned dates
+                all_returns_data = {}
+                all_dates = set()
                 
+                # Collect all unique dates
                 for ticker, data in tickers_data.items():
-                    # Convert to pandas Series with dates as index
-                    ticker_returns = pd.Series(
-                        data['returns'],
-                        index=pd.to_datetime(data['dates'])
-                    )
-                    all_returns[ticker] = ticker_returns
-                    
+                    all_dates.update(data['dates'])
+                
+                # Sort dates
+                all_dates = sorted(list(all_dates))
+                
+                # Initialize empty return series for all tickers across all dates
+                for ticker in ticker_list:
+                    all_returns_data[ticker] = {date: None for date in all_dates}
+                
+                # Fill in the returns data where available
+                for ticker, data in tickers_data.items():
+                    for i, date in enumerate(data['dates']):
+                        if i < len(data['returns']):
+                            all_returns_data[ticker][date] = data['returns'][i]
+                
+                # Create a properly aligned DataFrame
+                all_returns = pd.DataFrame(index=all_dates)
+                for ticker in ticker_list:
+                    all_returns[ticker] = [all_returns_data[ticker][date] for date in all_dates]
+                
                 # Drop any rows with missing data
                 all_returns = all_returns.dropna()
                 
@@ -2051,7 +1849,7 @@ def compare():
                 if not all_returns.empty and all_returns.shape[1] >= 2:
                     corr_matrix = all_returns.corr().values
                     
-                    # Convert to list of lists, ensuring 1D arrays
+                    # Convert to list of lists, ensuring proper type conversion
                     correlation_matrix = []
                     for i in range(corr_matrix.shape[0]):
                         correlation_matrix.append([float(corr_matrix[i,j]) for j in range(corr_matrix.shape[1])])
@@ -2059,13 +1857,13 @@ def compare():
             except Exception as corr_error:
                 print(f"Error calculating correlation matrix: {corr_error}")
                 # Fallback to identity matrix if correlation calculation fails
-                correlation_matrix = [[1.0 if i == j else 0.0 for j in range(len(tickers_data))] for i in range(len(tickers_data))]
+                correlation_matrix = [[1.0 if i == j else 0.0 for j in range(len(ticker_list))] for i in range(len(ticker_list))]
                 
             # Calculate key statistics
             stats = {}
             for ticker, data in tickers_data.items():
-                prices = data['prices']
-                returns = data['returns'][1:] # Skip the first NaN
+                prices = data['prices']  # This is now a list of floats
+                returns = data['returns'][1:] if len(data['returns']) > 1 else []  # Skip the first NaN
                 
                 if not prices or len(prices) < 2:
                     continue
@@ -2087,13 +1885,11 @@ def compare():
                     'start_price': prices[0],
                     'end_price': prices[-1],
                     'change_pct': ((prices[-1] / prices[0]) - 1) * 100 if prices[0] > 0 else 0,
-                    'volatility': np.std(returns) * np.sqrt(252) * 100 if len(returns) > 0 else 0,
+                    'volatility': float(np.std(returns) * np.sqrt(252) * 100) if len(returns) > 0 else 0,
                     'max_drawdown': max_drawdown
                 }
                 
             # Create the results object
-            ticker_list = list(tickers_data.keys())
-            
             results = {
                 'tickers': ticker_list,
                 'period': period,
@@ -2113,7 +1909,6 @@ def compare():
             return render_template("compare.html", error=f"Error comparing stocks: {str(e)}", current_date=current_date)
             
     return render_template("compare.html", current_date=current_date)
-
 # -------------------------------
 # User Account Routes
 # -------------------------------

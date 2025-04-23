@@ -1,1 +1,1 @@
-# ML_PROJ
+pip install -r requirements.txt
