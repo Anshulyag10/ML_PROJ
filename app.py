@@ -437,7 +437,7 @@ def add_price_variability(predictions, volatility=0.02, trend_factor=0.3, seed=N
         
     return result
 
-def create_prediction_plot(test_dates, actual, pred_lstm, pred_rnn, pred_rl):
+def create_prediction_plot(test_dates, actual, pred_lstm):
     """Create an interactive Plotly chart for price predictions with dystopian color scheme"""
     fig = go.Figure()
     
@@ -457,22 +457,6 @@ def create_prediction_plot(test_dates, actual, pred_lstm, pred_rnn, pred_rl):
         mode='lines',
         name='LSTM Prediction',
         line=dict(color='#00E5FF', width=2, dash='dash') # Neon teal
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=test_dates, 
-        y=pred_rnn.flatten(),
-        mode='lines',
-        name='RNN Prediction',
-        line=dict(color='#76FF03', width=2, dash='dot') # Toxic green
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=test_dates, 
-        y=pred_rl.flatten(),
-        mode='lines',
-        name='RL Prediction',
-        line=dict(color='#FF1744', width=2, dash='dashdot') # Radiation red
     ))
     
     # Update layout with dystopian styling
@@ -594,13 +578,10 @@ def create_comparison_chart(tickers_data):
         # Make sure we have data
         if not prices or len(prices) < 2:
             continue
-            
-        # Calculate normalized prices
-        normalized_prices = [price / prices[0] * 100 for price in prices]
-        
+
         fig.add_trace(go.Scatter(
             x=dates,
-            y=normalized_prices,
+            y=prices,
             mode='lines',
             name=ticker,
             line=dict(color=colors[i % len(colors)], width=2)
@@ -1186,25 +1167,6 @@ def price_predictor():
             x.append(data[i-time_step:i, 0])
             y.append(data[i, 0])
         return np.array(x), np.array(y)
-
-    # Helper function for plotting predictions
-    def create_prediction_plot(dates, actual, predicted):
-        plt.figure(figsize=(12, 6))
-        plt.plot(dates, actual, 'b-', label='Actual Price')
-        plt.plot(dates, predicted, 'r-', label='LSTM Prediction')
-        plt.title('Stock Price Prediction vs Actual')
-        plt.xlabel('Date')
-        plt.ylabel('Price')
-        plt.legend()
-        plt.grid(True)
-        
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png')
-        buf.seek(0)
-        img_str = base64.b64encode(buf.read()).decode('utf-8')
-        plt.close()  # Explicitly close the figure to prevent memory leaks
-        
-        return f"data:image/png;base64,{img_str}"
 
     # Helper function for metrics visualization
     def create_performance_chart(metrics):
