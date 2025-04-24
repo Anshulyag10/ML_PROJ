@@ -835,32 +835,45 @@ class StockSentimentAnalyzer:
         else:
             market_mood = "Neutral"
             
-        # Calculate confidence based on consensus
+        # Fix the confidence calculation - Calculate proper confidence based on consensus
+        # Use the count that corresponds to the current market mood
         if market_mood == "Bullish":
-            confidence = positive_count / total_articles
+            # Confidence is the percentage of positive articles
+            confidence = (positive_count / total_articles)  if total_articles > 0 else 0
         elif market_mood == "Bearish":
-            confidence = negative_count / total_articles
+            # Confidence is the percentage of negative articles
+            confidence = (negative_count / total_articles)  if total_articles > 0 else 0
         else:
-            confidence = neutral_count / total_articles
+            # Confidence is the percentage of neutral articles
+            confidence = (neutral_count / total_articles) if total_articles > 0 else 0
             
-        confidence = round(confidence * 100, 1)
+        # Ensure confidence is capped at 100%
+        confidence = min(round(confidence, 1), 100.0)
         
         # Get price performance
         try:
             stock_data = yf.Ticker(ticker)
             hist = stock_data.history(period="5d")
             if not hist.empty and len(hist) > 1:
+                # Extract just the numeric value for price
+                latest_price = float(hist['Close'].iloc[-1])
+                
+                # Calculate price change
                 price_change = ((hist['Close'].iloc[-1] - hist['Close'].iloc[0]) / hist['Close'].iloc[0]) * 100
                 price_change = round(price_change, 2)
             else:
+                latest_price = 0
                 price_change = 0
-        except:
+        except Exception as e:
+            print(f"Error getting stock data: {e}")
+            latest_price = 0
             price_change = 0
             
         return {
             "ticker": ticker,
+            "price": latest_price,  # Clean numeric value
             "market_mood": market_mood,
-            "confidence": confidence,
+            "confidence": confidence,  # Fixed confidence calculation
             "average_score": average_score,
             "sentiment_counts": {
                 "positive": positive_count,
