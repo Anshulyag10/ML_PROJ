@@ -1169,7 +1169,6 @@ def index():
 def price_predictor():
     """Price prediction page using Yahoo Finance data with improved LSTM model"""
     
-
     # Set non-interactive backend before importing pyplot
     matplotlib.use('Agg')  # Fixes the "main thread is not in main loop" error
 
@@ -1217,6 +1216,44 @@ def price_predictor():
         trend = np.cumsum(np.random.normal(0, 1, n)) * trend_factor * volatility / np.sqrt(n)
         noise = np.random.normal(0, volatility, n)
         return preds * (1 + noise + trend).reshape(-1, 1)
+    
+    # NEW FUNCTION: Multi-step forecasting by iteratively feeding predictions back as inputs
+    def forecast_future_prices(model, last_window, scaler, days_ahead):
+        """
+        Generate multi-step forecasts by iteratively feeding predictions back as inputs.
+        
+        Args:
+            model: Trained LSTM model
+            last_window: The most recent window of prices (scaled)
+            scaler: The scaler used to transform the data
+            days_ahead: Number of days to forecast
+        
+        Returns:
+            Array of predicted prices (in original scale)
+        """
+        # Make a copy of the last window to avoid modifying the original
+        curr_window = last_window.copy()
+        future_predictions = []
+        
+        # Iterate for each day we want to predict
+        for _ in range(days_ahead):
+            # Reshape window for prediction (samples, time_steps, features)
+            curr_window_reshaped = curr_window.reshape(1, curr_window.shape[0], 1)
+            
+            # Predict the next day
+            next_day = model.predict(curr_window_reshaped, verbose=0)
+            
+            # Store the prediction (in scaled form for now)
+            future_predictions.append(next_day[0, 0])
+            
+            # Update the window: drop oldest, add newest prediction
+            curr_window = np.append(curr_window[1:], next_day[0, 0])
+        
+        # Convert predictions to original scale
+        future_predictions = np.array(future_predictions).reshape(-1, 1)
+        future_predictions = scaler.inverse_transform(future_predictions)
+        
+        return future_predictions.flatten()
 
     current_date = dt.datetime.now().strftime('%A, %B %d, %Y, %I:%M %p')
     today = dt.date.today()
@@ -1339,17 +1376,29 @@ def price_predictor():
         mae = mean_absolute_error(actual_test, pred_test)
         mae_percentage = (mae / np.mean(actual_test)) * 100
         r2 = r2_score(actual_test, pred_test)
-
+        
         # Calculate success rate (compatibility with original template)
         train_success = calculate_success(actual_train, pred_train)
         test_success = calculate_success(actual_test, pred_test)
 
-        # ----- Future Prediction -----
-        last_window = scaled_data[-time_step:].reshape(1, time_step, 1)
-        future_pred = lstm_model.predict(last_window)
-        future_pred = scaler.inverse_transform(future_pred)[0][0]
+        # ----- Future Prediction with Multi-Step Forecasting -----
+        # Calculate days between current date and target future date
+        future_date_obj = dt.datetime.fromisoformat(future_date)
+        days_ahead = (future_date_obj.date() - today).days
         
-        # Add some realistic variability (±3%)
+        # Make sure we're forecasting at least 1 day ahead
+        days_ahead = max(1, days_ahead)
+        
+        # Get the last window of data for forecasting
+        last_window = scaled_data[-time_step:]
+        
+        # Generate multi-step forecast
+        future_predictions = forecast_future_prices(lstm_model, last_window, scaler, days_ahead)
+        
+        # The final day's prediction is what we care about for the target date
+        future_pred = future_predictions[-1]
+        
+        # Add realistic variability
         future_pred = future_pred * (1 + random.uniform(-0.03, 0.03))
 
         # ----- Create charts -----
@@ -1362,7 +1411,7 @@ def price_predictor():
             "R² Score": f"{r2:.4f}"
         }
         performance_plot = create_performance_chart(performance_metrics)
-
+        
         # ----- Prepare results structure for template compatibility -----
         models = [
             {"name": "LSTM", "train_success": f"{train_success:.2f}", "test_success": f"{test_success:.2f}"}
@@ -1484,6 +1533,7 @@ def price_predictor():
         ticker=ticker_param,
         today=today
     )
+
 
 
 

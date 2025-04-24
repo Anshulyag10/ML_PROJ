@@ -83,21 +83,21 @@
                 <div class="feature-card">
                     <div class="feature-icon predictor-icon"></div>
                     <h3>Price Prediction</h3>
-                    <p>Multi-model neural networks forecast future asset prices with advanced pattern recognition</p>
+                    <p>Multi-layer LSTM neural networks forecast future asset prices with advanced time-series analysis</p>
                     <a href="{{ url_for('price_predictor') }}" class="neo-button small">Predict Prices</a>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon sentiment-icon"></div>
                     <h3>Sentiment Analysis</h3>
-                    <p>NLP algorithms decode market sentiment across news, social media, and financial reports</p>
+                    <p>VADER and TextBlob algorithms decode market sentiment across news, social media, and financial reports</p>
                     <a href="{{ url_for('sentiment_analyzer') }}" class="neo-button small">Analyze Sentiment</a>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon portfolio-icon"></div>
                     <h3>Portfolio Optimization</h3>
-                    <p>Quantum algorithms generate optimal asset allocations based on your risk profile</p>
+                    <p>Advanced algorithms generate optimal asset allocations based on your risk profile</p>
                     <a href="{{ url_for('portfolio_optimizer') }}" class="neo-button small">Optimize Portfolio</a>
                 </div>
                 
@@ -119,8 +119,6 @@
             
             <div class="tech-tabs">
                 <div class="tab active" data-tab="lstm">LSTM Networks</div>
-                <div class="tab" data-tab="rnn">Recurrent Neural Networks</div>
-                <div class="tab" data-tab="reinforcement">Reinforcement Learning</div>
                 <div class="tab" data-tab="nlp">NLP Sentiment Analysis</div>
             </div>
             
@@ -151,137 +149,35 @@
                         </div>
                         <div class="tech-info">
                             <h3>Long Short-Term Memory Networks</h3>
-                            <p>Our LSTM models identify long-term dependencies in financial time series data, allowing them to detect complex market cycles and persistent patterns.</p>
+                            <p>Our advanced multi-layer LSTM models identify complex dependencies in financial time series data, allowing them to detect intricate market cycles and persistent patterns for accurate predictions.</p>
                             
                             <div class="tech-features">
-                                <div class="tech-feature">
-                                    <h4>Memory Cells</h4>
-                                    <p>Specialized neurons retain information over extended sequences, essential for long-term price patterns</p>
-                                </div>
-                                <div class="tech-feature">
-                                    <h4>Gate Controls</h4>
-                                    <p>Sophisticated gates control what information is retained or forgotten, filtering market noise</p>
-                                </div>
                                 <div class="tech-feature">
                                     <h4>Deep Architecture</h4>
-                                    <p>60-day lookback windows with multiple stacked LSTM layers capture hierarchical patterns</p>
+                                    <p>Four stacked LSTM layers (50, 60, 80, 120 neurons) with dropout for robust predictions</p>
+                                </div>
+                                <div class="tech-feature">
+                                    <h4>Adaptive Time Windows</h4>
+                                    <p>Dynamic lookback periods from 30-60 days based on available market data</p>
+                                </div>
+                                <div class="tech-feature">
+                                    <h4>Intelligent Training</h4>
+                                    <p>Customized training epochs scaled to dataset size for optimal performance</p>
                                 </div>
                             </div>
                             
                             <div class="advantage-list">
                                 <div class="advantage">
                                     <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Excels at predicting markets with long-term cycles</div>
+                                    <div class="advantage-text">Advanced MinMaxScaler normalization for consistent predictions</div>
                                 </div>
                                 <div class="advantage">
                                     <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Maintains memory of critical market events</div>
+                                    <div class="advantage-text">Multiple performance metrics: MAE, MAE%, R² Score</div>
                                 </div>
                                 <div class="advantage">
                                     <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Filters out noise while preserving trend signals</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- RNN Tab Content -->
-                <div class="tab-content" id="rnn-content">
-                    <div class="tech-grid">
-                        <div class="tech-visual">
-                            <div class="rnn-visualization">
-                                <div class="rnn-sequence">
-                                    <div class="sequence-unit">
-                                        <div class="unit-cell"></div>
-                                    </div>
-                                    <div class="sequence-unit">
-                                        <div class="unit-cell"></div>
-                                    </div>
-                                    <div class="sequence-unit">
-                                        <div class="unit-cell"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="tech-info">
-                            <h3>Recurrent Neural Networks</h3>
-                            <p>Our RNN models process market data sequentially, maintaining internal states that capture short to medium-term momentum and trend patterns.</p>
-                            
-                            <div class="tech-features">
-                                <div class="tech-feature">
-                                    <h4>Sequential Processing</h4>
-                                    <p>Processes data points one after another, maintaining context between time steps</p>
-                                </div>
-                                <div class="tech-feature">
-                                    <h4>Internal State</h4>
-                                    <p>Maintains a hidden state vector that evolves as new data arrives</p>
-                                </div>
-                                <div class="tech-feature">
-                                    <h4>Efficient Training</h4>
-                                    <p>Requires less computational resources than LSTM for short-term predictions</p>
-                                </div>
-                            </div>
-                            
-                            <div class="advantage-list">
-                                <div class="advantage">
-                                    <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Ideal for capturing momentum in fast-moving markets</div>
-                                </div>
-                                <div class="advantage">
-                                    <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Faster training and deployment cycle</div>
-                                </div>
-                                <div class="advantage">
-                                    <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Excellent for day and swing trading strategies</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Reinforcement Learning Tab Content -->
-                <div class="tab-content" id="reinforcement-content">
-                    <div class="tech-grid">
-                        <div class="tech-visual">
-                            <div class="rl-visualization">
-                                <div class="rl-agent"></div>
-                                <div class="rl-environment"></div>
-                                <div class="rl-reward"></div>
-                            </div>
-                        </div>
-                        <div class="tech-info">
-                            <h3>Reinforcement Learning</h3>
-                            <p>Our RL models use advanced Q-learning to discover optimal trading strategies through trial-and-error interactions with market environments.</p>
-                            
-                            <div class="tech-features">
-                                <div class="tech-feature">
-                                    <h4>Adaptive Behavior</h4>
-                                    <p>Self-improves by maximizing cumulative rewards through market interactions</p>
-                                </div>
-                                <div class="tech-feature">
-                                    <h4>Policy Networks</h4>
-                                    <p>Deep policy networks map market states to optimal trading decisions</p>
-                                </div>
-                                <div class="tech-feature">
-                                    <h4>Multi-factor Analysis</h4>
-                                    <p>Considers hundreds of market factors simultaneously for decision-making</p>
-                                </div>
-                            </div>
-                            
-                            <div class="advantage-list">
-                                <div class="advantage">
-                                    <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Adapts to changing market conditions in real-time</div>
-                                </div>
-                                <div class="advantage">
-                                    <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Discovers non-intuitive trading strategies</div>
-                                </div>
-                                <div class="advantage">
-                                    <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Balances risk and reward optimally</div>
+                                    <div class="advantage-text">Realistic price variability modeling with volatility factors</div>
                                 </div>
                             </div>
                         </div>
@@ -299,35 +195,35 @@
                         </div>
                         <div class="tech-info">
                             <h3>NLP Sentiment Analysis</h3>
-                            <p>Our natural language processing models analyze millions of news articles, social media posts, and financial reports to gauge market sentiment.</p>
+                            <p>Our dual-engine natural language processing system analyzes financial news and reports from multiple sources to gauge market sentiment with weighted confidence scoring.</p>
                             
                             <div class="tech-features">
                                 <div class="tech-feature">
-                                    <h4>Transformer Architecture</h4>
-                                    <p>Uses attention mechanisms to understand context and meaning in financial texts</p>
+                                    <h4>Hybrid Sentiment Engine</h4>
+                                    <p>Combines VADER (70%) and TextBlob (30%) algorithms for balanced sentiment scoring</p>
                                 </div>
                                 <div class="tech-feature">
                                     <h4>Multi-source Integration</h4>
-                                    <p>Combines signals from diverse information sources with proper weighting</p>
+                                    <p>Analyzes news from Finnhub API, Finviz, and major financial publications</p>
                                 </div>
                                 <div class="tech-feature">
-                                    <h4>Entity Recognition</h4>
-                                    <p>Identifies companies, products, and events that impact market sentiment</p>
+                                    <h4>Quantified Market Mood</h4>
+                                    <p>Translates sentiment into actionable Bullish/Bearish/Neutral signals with confidence percentages</p>
                                 </div>
                             </div>
                             
                             <div class="advantage-list">
                                 <div class="advantage">
                                     <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Detects market sentiment shifts before price movements</div>
+                                    <div class="advantage-text">Detailed sentiment breakdowns with positive/negative/neutral counts</div>
                                 </div>
                                 <div class="advantage">
                                     <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Quantifies the impact of news and social chatter</div>
+                                    <div class="advantage-text">Correlates sentiment with 5-day price performance</div>
                                 </div>
                                 <div class="advantage">
                                     <div class="advantage-icon"></div>
-                                    <div class="advantage-text">Filters out noise to identify meaningful signals</div>
+                                    <div class="advantage-text">Intelligent fallback scraping when primary APIs are unavailable</div>
                                 </div>
                             </div>
                         </div>

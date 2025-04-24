@@ -10,53 +10,105 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fixes.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.plotly.js.org/plotly-latest.min.js"></script>
+    <style>
+        /* Header styles for extreme alignment */
+        .site-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #000;
+            padding: 0 40px;
+            height: 60px;
+            border-bottom: 1px solid rgba(15, 248, 231, 0.3);
+        }
+        
+        .logo {
+            color: #0ff8e7;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        
+        .nav-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .main-nav ul {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .main-nav li {
+            margin: 0 15px;
+        }
+        
+        .main-nav a {
+            color: #8a8a8a;
+            text-decoration: none;
+            font-size: 16px;
+            padding: 20px 0;
+        }
+        
+        .main-nav a:hover {
+            color: #0ff8e7;
+        }
+        
+        .main-nav a.active {
+            color: #0ff8e7;
+            border-bottom: 2px solid #0ff8e7;
+        }
+        
+        .auth-buttons {
+            display: flex;
+            margin-left: 30px;
+        }
+        
+        .auth-button {
+            padding: 8px 20px;
+            margin-left: 10px;
+            border: 1px solid #0ff8e7;
+            border-radius: 2px;
+            color: #0ff8e7;
+            background-color: transparent;
+            text-decoration: none;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        
+        .auth-button.register {
+            background-color: #0ff8e7;
+            color: #000;
+        }
+    </style>
 </head>
+
 <body>
     <div class="site-container">
-        <!-- Header Navigation -->
+        <!-- Header Navigation - COSMIC FINANCE left, menu right -->
         <header class="site-header">
-            <div class="logo-container">
-                <a href="/" class="logo">COSMIC FINANCE</a>
-            </div>
-            <div class="market-data">
-                <div class="market-item up">
-                    <span class="market-name">NASDAQ</span>
-                    <span class="market-value">16,384.12</span>
-                    <span class="market-change">+1.73%</span>
+            <a href="/" class="logo">COSMIC FINANCE</a>
+            
+            <div class="nav-container">
+                <nav class="main-nav">
+                    <ul>
+                        <li><a href="/">Home</a></li>
+                        <li><a href="/portfolio">Portfolio</a></li>
+                        <li><a href="/price_predictor" class="active">Predictor</a></li>
+                        <li><a href="/sentiment">Sentiment</a></li>
+                        <li><a href="/ticker_search">Tickers</a></li>
+                        <li><a href="/compare">Compare</a></li>
+                    </ul>
+                </nav>
+                
+                <div class="auth-buttons">
+                    <a href="/login" class="auth-button login">LOGIN</a>
+                    <a href="/register" class="auth-button register">REGISTER</a>
                 </div>
-                <div class="market-item down">
-                    <span class="market-name">S&P 500</span>
-                    <span class="market-value">4,932.45</span>
-                    <span class="market-change">-0.25%</span>
-                </div>
-                <div class="market-item up">
-                    <span class="market-name">BTC</span>
-                    <span class="market-value">68,927.65</span>
-                    <span class="market-change">+2.48%</span>
-                </div>
-            </div>
-            <div class="current-date">
-                {{ current_date }}
-            </div>
-            <div class="search-box">
-                <input type="text" placeholder="Search tickers...">
-                <button type="submit" class="search-button">
-                    <svg viewBox="0 0 24 24" class="search-icon"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                </button>
-            </div>
-            <nav class="main-nav">
-                <ul>
-                    <li><a href="/">Home</a></li>
-                    <li><a href="/portfolio">Portfolio</a></li>
-                    <li><a href="/price_predictor" class="active">Predictor</a></li>
-                    <li><a href="/sentiment">Sentiment</a></li>
-                    <li><a href="/ticker_search">Tickers</a></li>
-                    <li><a href="/compare">Compare</a></li>
-                </ul>
-            </nav>
-            <div class="auth-buttons">
-                <a href="/login" class="auth-button login">Login</a>
-                <a href="/register" class="auth-button register">Register</a>
             </div>
         </header>
 
@@ -81,6 +133,7 @@
                         <div class="panel-header">
                             <h2>Input Parameters</h2>
                         </div>
+                        
                         <div class="panel-body">
                             <form id="predictor-form" method="post" action="{{ url_for('price_predictor') }}">
                                 <div class="form-group">
@@ -91,6 +144,7 @@
                                             <svg viewBox="0 0 24 24" class="search-icon"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                                         </button>
                                     </div>
+                                    
                                     <div class="ticker-suggestions" id="ticker-suggestions"></div>
                                 </div>
                                 
@@ -121,45 +175,6 @@
                             </form>
                         </div>
                     </div>
-                    
-                    <div class="neo-panel info-panel">
-                        <div class="panel-header">
-                            <h3>Market Summary</h3>
-                        </div>
-                        <div class="market-summary">
-                            <div class="summary-item">
-                                <span class="item-label">Trading Volume</span>
-                                <span class="item-value">84.5B</span>
-                            </div>
-                            <div class="summary-item">
-                                <span class="item-label">Market Volatility</span>
-                                <span class="item-value">Medium</span>
-                            </div>
-                            <div class="summary-item">
-                                <span class="item-label">Market Sentiment</span>
-                                <span class="item-value up">Bullish</span>
-                            </div>
-                        </div>
-                        
-                        <div class="recent-predictions">
-                            <h4>Recent Predictions</h4>
-                            <div class="prediction-item">
-                                <span class="ticker">AAPL</span>
-                                <span class="prediction">+2.7%</span>
-                                <span class="accuracy">92% accurate</span>
-                            </div>
-                            <div class="prediction-item">
-                                <span class="ticker">MSFT</span>
-                                <span class="prediction">+1.4%</span>
-                                <span class="accuracy">88% accurate</span>
-                            </div>
-                            <div class="prediction-item">
-                                <span class="ticker">TSLA</span>
-                                <span class="prediction">-3.2%</span>
-                                <span class="accuracy">78% accurate</span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Right Panel: Results -->
@@ -172,28 +187,31 @@
                                 <div class="ticker-badge">{{ results.ticker }}</div>
                             </div>
                         </div>
+                        
                         <div class="panel-body">
                             <div class="company-stats">
                                 <div class="stat-item">
                                     <div class="stat-label">Current Price</div>
                                     <div class="stat-value">${{ results.company_info.current_price|round(2) }}</div>
                                 </div>
+                                
                                 <div class="stat-item">
                                     <div class="stat-label">Daily Change</div>
                                     <div class="stat-value 
-    {% if results.company_info.daily_change is defined %}
-        {% if results.company_info.daily_change > 0 %}up{% else %}down{% endif %}
-    {% else %}
-        neutral
-    {% endif %}">
-
+                                    {% if results.company_info.daily_change is defined %}
+                                        {% if results.company_info.daily_change > 0 %}up{% else %}down{% endif %}
+                                    {% else %}
+                                        neutral
+                                    {% endif %}">
                                         {% if results.company_info.daily_change > 0 %}+{% endif %}{{ results.company_info.daily_change }}%
                                     </div>
                                 </div>
+                                
                                 <div class="stat-item">
                                     <div class="stat-label">Market Cap</div>
                                     <div class="stat-value">{{ results.company_info.market_cap }}</div>
                                 </div>
+                                
                                 <div class="stat-item">
                                     <div class="stat-label">Volume</div>
                                     <div class="stat-value">{{ results.company_info.volume }}</div>
@@ -206,13 +224,16 @@
                             
                             <div class="forecast-summary">
                                 <h3>Prediction Results</h3>
+                                
                                 <div class="model-cards">
                                     <div class="model-card">
                                         <div class="model-header">
                                             <div class="model-icon lstm-icon"></div>
                                             <h4>LSTM</h4>
                                         </div>
+                                        
                                         <div class="price-prediction">${{ results.future_pred_lstm }}</div>
+                                        
                                         <div class="prediction-change 
                                             {% if results.future_pred_lstm|float > results.company_info.current_price|float %}positive{% else %}negative{% endif %}">
                                             {% if results.future_pred_lstm|float > results.company_info.current_price %}
@@ -221,11 +242,13 @@
                                             ▼ {{ ((results.company_info.current_price - results.future_pred_lstm|float) / results.company_info.current_price * 100)|round(2) }}%
                                             {% endif %}
                                         </div>
+                                        
                                         <div class="model-accuracy">
                                             <div class="accuracy-item">
                                                 <span class="accuracy-label">Training Accuracy:</span>
                                                 <span class="accuracy-value">{{ results.models[0].train_success }}%</span>
                                             </div>
+                                            
                                             <div class="accuracy-item">
                                                 <span class="accuracy-label">Test Accuracy:</span>
                                                 <span class="accuracy-value">{{ results.models[0].test_success }}%</span>
@@ -235,50 +258,7 @@
                                 </div>
                             </div>
                             
-                            <div class="chart-container">
-                                <div class="chart-tabs">
-                                    <button class="chart-tab active" data-chart="prediction">Price Prediction</button>
-                                    <button class="chart-tab" data-chart="historical">Historical Data</button>
-                                </div>
-                                <div class="chart-content">
-                                    <div id="prediction-chart" class="chart active"></div>
-                                    <div id="historical-chart" class="chart"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="signals-panel">
-                                <h3>Trading Signals</h3>
-                                <div class="signals-grid">
-                                    <div class="signal-card">
-                                        <div class="signal-icon technical-icon"></div>
-                                        <div class="signal-content">
-                                            <h4>Technical Analysis</h4>
-                                            <p>MACD indicates a bullish trend. RSI at 62 suggests moderate momentum.</p>
-                                        </div>
-                                    </div>
-                                    <div class="signal-card">
-                                        <div class="signal-icon sentiment-icon"></div>
-                                        <div class="signal-content">
-                                            <h4>Sentiment Analysis</h4>
-                                            <p>Market sentiment is positive based on news and social media analysis.</p>
-                                        </div>
-                                    </div>
-                                    <div class="signal-card">
-                                        <div class="signal-icon volatility-icon"></div>
-                                        <div class="signal-content">
-                                            <h4>Volatility Index</h4>
-                                            <p>Expected volatility is medium with potential for upside movement.</p>
-                                        </div>
-                                    </div>
-                                    <div class="signal-card">
-                                        <div class="signal-icon consensus-icon"></div>
-                                        <div class="signal-content">
-                                            <h4>Model Consensus</h4>
-                                            <p>LSTM model indicates a bullish trend for this time frame.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <!-- Trading Signals section removed as requested -->
                         </div>
                     </div>
                     {% else %}
@@ -290,8 +270,11 @@
                                 <path d="M30 45H50M40 35V55" stroke="#0ff8e7" stroke-width="2"/>
                             </svg>
                         </div>
+                        
                         <h3>No Prediction Generated</h3>
+                        
                         <p>Enter a stock ticker symbol and prediction date to generate a forecast using our LSTM neural network model.</p>
+                        
                         <p>Our AI combines historical price data, market sentiment, technical indicators, and volatility analysis for accurate predictions.</p>
                     </div>
                     {% endif %}
@@ -305,6 +288,7 @@
                     <h3>COSMIC FINANCE</h3>
                     <p>Advanced financial prediction and analysis powered by neural networks.</p>
                 </div>
+                
                 <div class="footer-section">
                     <h3>Features</h3>
                     <ul>
@@ -314,6 +298,7 @@
                         <li><a href="/compare">Market Comparison</a></li>
                     </ul>
                 </div>
+                
                 <div class="footer-section">
                     <h3>Links</h3>
                     <ul>
@@ -324,8 +309,10 @@
                     </ul>
                 </div>
             </div>
+            
             <div class="footer-bottom">
                 <p>&copy; 2025 Cosmic Finance | AI-Powered Financial Analytics</p>
+                
                 <p class="disclaimer">DISCLAIMER: Predictions are based on historical data analysis and should not be considered financial advice.</p>
             </div>
         </footer>
@@ -336,23 +323,5 @@
 
     <!-- Scripts -->
     <script src="{{ url_for('static', filename='js/price-predictor.js') }}"></script>
-    
-    {% if price_plot %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const priceData = {{ price_plot|safe }};
-            Plotly.newPlot('prediction-chart', priceData.data, priceData.layout);
-        });
-    </script>
-    {% endif %}
-    
-    {% if historical_plot %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const historicalData = {{ historical_plot|safe }};
-            Plotly.newPlot('historical-chart', historicalData.data, historicalData.layout);
-        });
-    </script>
-    {% endif %}
 </body>
 </html>
