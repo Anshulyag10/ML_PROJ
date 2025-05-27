@@ -101,7 +101,7 @@
                                             <span class="risk-label">High</span>
                                         </div>
                                     </div>
-                                    <input type="hidden" id="risk_preference" name="risk_preference" value="Moderate">
+                                    <input type="hidden" id="risk_preference" name="risk_preference" value="moderate">
                                 </div>
                                 
                                 <button type="submit" class="neo-button primary">OPTIMIZE PORTFOLIO</button>
@@ -276,6 +276,56 @@
     <!-- Scripts -->
     <script src="{{ url_for('static', filename='js/space-anim.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    <!-- Risk slider script to update the hidden input field -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get the slider and hidden input
+            const riskSlider = document.getElementById('risk_slider');
+            const riskInput = document.getElementById('risk_preference');
+            
+            // Set initial value based on slider position
+            if (riskSlider && riskInput) {
+                updateRiskPreference(riskSlider.value);
+                
+                // Update hidden input when slider changes
+                riskSlider.addEventListener('input', function() {
+                    updateRiskPreference(this.value);
+                });
+            }
+            
+            // Function to map slider value to risk preference
+            function updateRiskPreference(sliderValue) {
+                let preference;
+                
+                switch (parseInt(sliderValue)) {
+                    case 1:
+                        preference = "low";
+                        break;
+                    case 2:
+                        preference = "moderate";
+                        break;
+                    case 3:
+                        preference = "high";
+                        break;
+                    default:
+                        preference = "moderate";
+                }
+                
+                riskInput.value = preference;
+                
+                // Highlight the active risk label
+                const riskLabels = document.querySelectorAll('.risk-label');
+                riskLabels.forEach((label, index) => {
+                    if (index === parseInt(sliderValue) - 1) {
+                        label.classList.add('active');
+                    } else {
+                        label.classList.remove('active');
+                    }
+                });
+            }
+        });
+    </script>
     
     {% if results %}
     <script>

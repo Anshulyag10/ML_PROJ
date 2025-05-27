@@ -221,14 +221,57 @@ def login_required(f):
 
 class PortfolioOptimizer:
     def __init__(self):
-        pass
+        # Risk preference parameters
+        self.risk_parameters = {
+            'low': {
+                'max_volatility': 0.15,  # 15% maximum annual volatility
+                'min_sharpe_ratio': 0.5,
+                'return_weight': 0.3,    # Lower weight on returns
+                'risk_weight': 0.7       # Higher weight on risk minimization
+            },
+            'moderate': {
+                'max_volatility': 0.25,  # 25% maximum annual volatility
+                'min_sharpe_ratio': 0.7,
+                'return_weight': 0.5,    # Equal weight on returns and risk
+                'risk_weight': 0.5
+            },
+            'high': {
+                'max_volatility': 0.40,  # 40% maximum annual volatility
+                'min_sharpe_ratio': 0.8,
+                'return_weight': 0.8,    # Higher weight on returns
+                'risk_weight': 0.2       # Lower weight on risk minimization
+            }
+        }
         
     def optimize_portfolio(self, tickers, risk_preference='moderate'):
-        """Optimize a portfolio of assets based on historical data"""
+        """
+        Optimize a portfolio of assets based on historical data and risk preference
+        
+        Parameters:
+        - tickers: List of stock tickers
+        - risk_preference: 'low', 'moderate', or 'high'
+        
+        Returns:
+        - Portfolio optimization results including weights and performance metrics
+        """
         try:
+            import datetime as dt
+            import numpy as np
+            import pandas as pd
+            import yfinance as yf
+            from scipy.optimize import minimize
+            from flask import current_app as app
+            
+            # Validate risk_preference
+            if risk_preference.lower() not in self.risk_parameters:
+                app.logger.warning(f"Invalid risk preference: {risk_preference}. Using 'moderate' instead.")
+                risk_preference = 'moderate'
+                
+            risk_params = self.risk_parameters[risk_preference.lower()]
+            
             # Get historical data for tickers
             end_date = dt.date.today()
-            start_date = end_date - dt.timedelta(days=365 * 3) # 3 years of data
+            start_date = end_date - dt.timedelta(days=365 * 5)  # 5 years of data for better estimates
             
             app.logger.info(f"Optimizing portfolio for tickers: {tickers} with risk preference: {risk_preference}")
             
@@ -282,42 +325,29 @@ class PortfolioOptimizer:
             risk_free_rate = 0.02/252  # Assuming 2% annual risk-free rate, converted to daily
             
             # Define the objective function based on risk preference
-            if risk_preference.lower() == 'low':
-                # Conservative - Minimize volatility with a minimum return constraint
-                min_return = np.min(mean_returns) * 252  # Minimum acceptable return
+            def objective(weights):
+                portfolio_return = np.sum(mean_returns * weights) * 252  # Annualized return
+                portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)  # Annualized volatility
+                sharpe_ratio = (portfolio_return - risk_free_rate * 252) / portfolio_volatility
                 
-                def objective(weights):
-                    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
-                    portfolio_return = np.sum(mean_returns * weights) * 252
-                    
-                    # Penalty if return is below minimum
-                    return_penalty = max(0, min_return - portfolio_return) * 100
-                    
-                    return portfolio_volatility + return_penalty
-                    
-            elif risk_preference.lower() == 'high':
-                # Aggressive - Maximize return with a volatility constraint
-                def objective(weights):
-                    portfolio_return = np.sum(mean_returns * weights) * 252
-                    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
-                    
-                    # High risk tolerance - heavily weight return maximization
-                    return -portfolio_return + 0.5 * portfolio_volatility
-                    
-            else:  # 'moderate'
-                # Balanced - Maximize Sharpe ratio
-                def objective(weights):
-                    portfolio_return = np.sum(mean_returns * weights) * 252
-                    portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
-                    
-                    # Sharpe ratio: (return - risk_free_rate) / volatility
-                    sharpe_ratio = (portfolio_return - risk_free_rate * 252) / portfolio_volatility
-                    
-                    # We're minimizing, so negate
-                    return -sharpe_ratio
+                # Risk preference specific components
+                return_component = -portfolio_return  # Negative because we're minimizing
+                risk_component = portfolio_volatility
+                
+                # Apply risk preferences weights to return and risk components
+                weighted_objective = (risk_params['return_weight'] * return_component + 
+                                     risk_params['risk_weight'] * risk_component)
+                
+                # Add constraints as penalties for violating risk preferences
+                volatility_penalty = max(0, portfolio_volatility - risk_params['max_volatility']) * 100
+                sharpe_penalty = max(0, risk_params['min_sharpe_ratio'] - sharpe_ratio) * 10
+                
+                return weighted_objective + volatility_penalty + sharpe_penalty
             
-            # Constraints: weights sum to 1 and each weight >= 0
+            # Constraints: weights sum to 1
             constraints = {'type': 'eq', 'fun': lambda x: np.sum(x) - 1}
+            
+            # Bounds: each weight between 0 and 1
             bounds = tuple((0, 1) for _ in range(len(tickers)))
             
             # Initial guess (equal weights)
@@ -327,7 +357,7 @@ class PortfolioOptimizer:
             result = minimize(objective, initial_weights, method='SLSQP', bounds=bounds, constraints=constraints)
             
             if not result['success']:
-                app.logger.warning(f"Optimization failed: {result.get('message', 'Unknown error')}. Using equal weights.")
+                app.logger.warning(f"Optimization failed: {result.get('message', 'Unknown error')}. Using equally weighted portfolio.")
                 weights = initial_weights
             else:
                 weights = result['x']
@@ -338,29 +368,52 @@ class PortfolioOptimizer:
             portfolio_volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
             sharpe_ratio = (portfolio_return - risk_free_rate * 252) / portfolio_volatility
             
-            # Prepare portfolio data
+            # Calculate individual asset contributions
             portfolio_data = []
             for i, ticker in enumerate(tickers):
+                # Get mean return and volatility for this asset
+                ticker_return = mean_returns.iloc[i] if isinstance(mean_returns, pd.Series) else mean_returns[i]
+                ticker_volatility = np.sqrt(cov_matrix.iloc[i, i] if isinstance(cov_matrix, pd.DataFrame) else cov_matrix[i, i])
+                
+                # Calculate percentage contribution to risk
+                if portfolio_volatility > 0:
+                    marginal_contribution = weights[i] * (cov_matrix.iloc[i] if isinstance(cov_matrix, pd.DataFrame) else cov_matrix[i])
+                    risk_contribution = np.dot(marginal_contribution, weights) / portfolio_volatility
+                    risk_contribution_pct = risk_contribution / portfolio_volatility * 100
+                else:
+                    risk_contribution_pct = 0
+                
                 portfolio_data.append({
                     'ticker': ticker,
-                    'weight': weights[i] * 100, # Convert to percentage
-                    'expected_return': mean_returns.iloc[i] * 252 * 100 if isinstance(mean_returns, pd.Series) else mean_returns[i] * 252 * 100, # Annualized percentage
-                    'volatility': np.sqrt(cov_matrix.iloc[i, i] if isinstance(cov_matrix, pd.DataFrame) else cov_matrix[i, i]) * np.sqrt(252) * 100 # Annualized percentage
+                    'weight': weights[i] * 100,  # Convert to percentage
+                    'expected_return': ticker_return * 252 * 100,  # Annualized percentage
+                    'volatility': ticker_volatility * np.sqrt(252) * 100,  # Annualized percentage
+                    'risk_contribution': risk_contribution_pct
                 })
                 
             # Sort by weight, descending
             portfolio_data.sort(key=lambda x: x['weight'], reverse=True)
             
+            # Calculate risk profile metrics
+            risk_profile = {
+                'targeted_max_volatility': risk_params['max_volatility'] * 100,  # As percentage
+                'targeted_min_sharpe': risk_params['min_sharpe_ratio'],
+                'return_risk_preference': f"{risk_params['return_weight']}/{risk_params['risk_weight']}"
+            }
+            
             # Log the results
-            app.logger.info(f"Portfolio return: {portfolio_return * 100:.2f}%, Portfolio volatility: {portfolio_volatility * 100:.2f}%, Sharpe ratio: {sharpe_ratio:.2f}")
+            app.logger.info(f"Portfolio return: {portfolio_return * 100:.2f}%, "
+                           f"Portfolio volatility: {portfolio_volatility * 100:.2f}%, "
+                           f"Sharpe ratio: {sharpe_ratio:.2f}")
             
             # Return results
             return {
                 'portfolio_data': portfolio_data,
-                'portfolio_return': portfolio_return * 100, # Convert to percentage
-                'portfolio_volatility': portfolio_volatility * 100, # Convert to percentage
+                'portfolio_return': portfolio_return * 100,  # Convert to percentage
+                'portfolio_volatility': portfolio_volatility * 100,  # Convert to percentage
                 'sharpe_ratio': sharpe_ratio,
-                'risk_preference': risk_preference
+                'risk_preference': risk_preference,
+                'risk_profile': risk_profile
             }
             
         except Exception as e:
@@ -711,50 +764,8 @@ class StockSentimentAnalyzer:
         # Collect news from Finviz
         news_items.extend(scrape_finviz(ticker))
         
-        # If no news can be scraped, generate realistic sample data
-        if not news_items:
-            market_trend = random.choice(["bullish", "bearish", "mixed"])
-            current_date = dt.datetime.now().strftime('%Y-%m-%d')
-            
-            sample_templates = {
-                "bullish": [
-                    f"{ticker} shares surge on strong earnings report",
-                    f"Analysts upgrade {ticker} citing growth potential",
-                    f"{ticker} announces new product line, stock jumps",
-                    f"Institutional investors increase stake in {ticker}",
-                    f"{ticker} beats market expectations, shares rally",
-                    f"Positive outlook for {ticker} as demand increases",
-                    f"{ticker} stock reaches new 52-week high"
-                ],
-                "bearish": [
-                    f"{ticker} shares plunge after disappointing quarterly results",
-                    f"Analysts downgrade {ticker} on growth concerns",
-                    f"{ticker} faces regulatory challenges, stock drops",
-                    f"Hedge funds reduce positions in {ticker}",
-                    f"{ticker} issues profit warning, shares fall",
-                    f"Market uncertainty weighs on {ticker} performance",
-                    f"{ticker} announces layoffs amid restructuring"
-                ],
-                "mixed": [
-                    f"{ticker} reports mixed quarterly results",
-                    f"Analysts have divided opinions on {ticker}'s outlook",
-                    f"{ticker} faces both opportunities and challenges ahead",
-                    f"New competition emerges for {ticker}, market impact unclear",
-                    f"{ticker} restructures operations, long-term impact uncertain",
-                    f"Economic factors create volatility for {ticker} stock",
-                    f"{ticker} shares fluctuate amid market uncertainty"
-                ]
-            }
-            
-            templates = sample_templates[market_trend]
-            for i in range(min(limit, len(templates))):
-                news_items.append({
-                    'title': templates[i],
-                    'link': '#',
-                    'source': random.choice(['Financial Times', 'Bloomberg', 'Reuters', 'WSJ']),
-                    'date': current_date
-                })
-                
+        # If no news can be scraped, return an empty list
+        # We'll handle this case in get_stock_sentiment
         return news_items[:limit]
         
     def analyze_sentiment(self, text):
@@ -791,7 +802,32 @@ class StockSentimentAnalyzer:
         news_articles = self.scrape_financial_news(ticker, limit=news_limit)
         
         if not news_articles:
-            return {"error": "No news articles found for this ticker"}
+            # Instead of returning an error, treat no news as a mixed signal
+            current_date = dt.datetime.now().strftime('%Y-%m-%d')
+            
+            # Create a default mixed signal response
+            return {
+                "ticker": ticker,
+                "price": self._get_stock_price(ticker),
+                "market_mood": "Neutral",  # Default to neutral when no news
+                "confidence": 0.5,  # Medium confidence
+                "average_score": 0.0,  # Neutral score
+                "sentiment_counts": {
+                    "positive": 0,
+                    "neutral": 1,  # Count as one neutral signal
+                    "negative": 0
+                },
+                "price_change_5d": self._get_price_change(ticker),
+                "articles": [{
+                    "title": f"No recent news found for {ticker}",
+                    "sentiment": "Neutral",
+                    "score": 0.0,
+                    "source": "System",
+                    "date": current_date,
+                    "link": "#"
+                }],
+                "mixed_signal": True  # Flag to indicate this is a mixed/no-news signal
+            }
             
         # Analyze sentiment for each article
         sentiment_results = []
@@ -835,58 +871,99 @@ class StockSentimentAnalyzer:
         else:
             market_mood = "Neutral"
             
-        # Fix the confidence calculation - Calculate proper confidence based on consensus
-        # Use the count that corresponds to the current market mood
+        # Calculate confidence based on consensus
         if market_mood == "Bullish":
-            # Confidence is the percentage of positive articles
-            confidence = (positive_count / total_articles)  if total_articles > 0 else 0
+            confidence = (positive_count / total_articles) if total_articles > 0 else 0
         elif market_mood == "Bearish":
-            # Confidence is the percentage of negative articles
-            confidence = (negative_count / total_articles)  if total_articles > 0 else 0
+            confidence = (negative_count / total_articles) if total_articles > 0 else 0
         else:
-            # Confidence is the percentage of neutral articles
             confidence = (neutral_count / total_articles) if total_articles > 0 else 0
             
-        # Ensure confidence is capped at 100%
-        confidence = min(round(confidence, 1), 100.0)
+        # Ensure confidence is capped at 1.0 (100%)
+        confidence = min(round(confidence, 1), 1.0)
         
-        # Get price performance
-        try:
-            stock_data = yf.Ticker(ticker)
-            hist = stock_data.history(period="5d")
-            if not hist.empty and len(hist) > 1:
-                # Extract just the numeric value for price
-                latest_price = float(hist['Close'].iloc[-1])
-                
-                # Calculate price change
-                price_change = ((hist['Close'].iloc[-1] - hist['Close'].iloc[0]) / hist['Close'].iloc[0]) * 100
-                price_change = round(price_change, 2)
-            else:
-                latest_price = 0
-                price_change = 0
-        except Exception as e:
-            print(f"Error getting stock data: {e}")
-            latest_price = 0
-            price_change = 0
-            
         return {
             "ticker": ticker,
-            "price": latest_price,  # Clean numeric value
+            "price": self._get_stock_price(ticker),
             "market_mood": market_mood,
-            "confidence": confidence,  # Fixed confidence calculation
+            "confidence": confidence,
             "average_score": average_score,
             "sentiment_counts": {
                 "positive": positive_count,
                 "neutral": neutral_count,
                 "negative": negative_count
             },
-            "price_change_5d": price_change,
-            "articles": sentiment_results
+            "price_change_5d": self._get_price_change(ticker),
+            "articles": sentiment_results,
+            "mixed_signal": False  # Regular analysis
         }
+    
+    def _get_stock_price(self, ticker):
+        """Get the latest stock price"""
+        try:
+            stock_data = yf.Ticker(ticker)
+            hist = stock_data.history(period="1d")
+            if not hist.empty:
+                return float(hist['Close'].iloc[-1])
+            return 0
+        except Exception as e:
+            print(f"Error getting stock price: {e}")
+            return 0
+    
+    def _get_price_change(self, ticker):
+        """Get the 5-day price change percentage"""
+        try:
+            stock_data = yf.Ticker(ticker)
+            hist = stock_data.history(period="5d")
+            if not hist.empty and len(hist) > 1:
+                price_change = ((hist['Close'].iloc[-1] - hist['Close'].iloc[0]) / hist['Close'].iloc[0]) * 100
+                return round(price_change, 2)
+            return 0
+        except Exception as e:
+            print(f"Error getting price change: {e}")
+            return 0
 
 # -------------------------------
 # Company Profiles API
 # -------------------------------
+
+import datetime as dt
+import yfinance as yf
+import pandas as pd
+import json
+import plotly
+import plotly.graph_objects as go
+from typing import Dict, List, Any, Optional
+
+# Check if Finnhub is available
+try:
+    import finnhub
+    FINNHUB_API_KEY = "your_finnhub_api_key"  # Replace with actual API key
+    finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
+    FINNHUB_AVAILABLE = True
+except ImportError:
+    FINNHUB_AVAILABLE = False
+    finnhub_client = None
+
+
+import datetime as dt
+import yfinance as yf
+import pandas as pd
+import json
+import plotly
+import plotly.graph_objects as go
+from typing import Dict, List, Any, Optional
+
+# Check if Finnhub is available
+try:
+    import finnhub
+    FINNHUB_API_KEY = "your_finnhub_api_key"  # Replace with actual API key
+    finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
+    FINNHUB_AVAILABLE = True
+except ImportError:
+    FINNHUB_AVAILABLE = False
+    finnhub_client = None
+
 
 class CompanyProfiler:
     """Class to handle company profile data retrieval and processing"""
@@ -894,9 +971,9 @@ class CompanyProfiler:
     def __init__(self):
         self.cache = {}
         self.cache_expiry = {}
-        self.cache_duration = dt.timedelta(days=1) # Cache for 1 day
+        self.cache_duration = dt.timedelta(days=1)  # Cache for 1 day
         
-    def get_company_profile(self, ticker):
+    def get_company_profile(self, ticker: str) -> Dict[str, Any]:
         """Get comprehensive company profile data"""
         # Check cache first
         current_time = dt.datetime.now()
@@ -911,25 +988,25 @@ class CompanyProfiler:
                     metrics = finnhub_client.company_basic_financials(ticker, 'all')
                     
                     # If we got good data from Finnhub
-                    if profile and 'name' in profile:
+                    if profile and isinstance(profile, dict) and 'name' in profile:
                         # Create a unified profile object
                         company_data = {
                             'name': profile.get('name', f"{ticker} Inc."),
                             'ticker': ticker,
                             'exchange': profile.get('exchange', 'Unknown'),
                             'industry': profile.get('finnhubIndustry', 'Technology'),
-                            'market_cap': profile.get('marketCapitalization', 0) * 1000000, # Convert to dollars
+                            'market_cap': profile.get('marketCapitalization', 0) * 1000000,  # Convert to dollars
                             'website': profile.get('weburl', '#'),
                             'logo': profile.get('logo', ''),
                             'country': profile.get('country', 'USA'),
                             'ipo_date': profile.get('ipo', ''),
                             'current_price': self._get_current_price(ticker),
                             'description': profile.get('description', 'No description available.'),
-                            'daily_change': 0.0 # Default value
+                            'daily_change': 0.0  # Default value
                         }
                         
                         # Add key financial metrics if available
-                        if metrics and 'metric' in metrics:
+                        if metrics and isinstance(metrics, dict) and 'metric' in metrics:
                             metric_data = metrics['metric']
                             company_data.update({
                                 'pe_ratio': metric_data.get('peBasicExclExtraTTM', 0),
@@ -943,15 +1020,7 @@ class CompanyProfiler:
                             })
                             
                         # Calculate daily change
-                        try:
-                            df = yf.download(ticker, period="2d", progress=False)
-                            if not df.empty and len(df) >= 2:
-                                today_close = df['Close'].iloc[-1]
-                                yesterday_close = df['Close'].iloc[-2]
-                                daily_change = ((today_close - yesterday_close) / yesterday_close) * 100
-                                company_data['daily_change'] = round(daily_change, 2)
-                        except Exception as e:
-                            print(f"Error calculating daily change: {str(e)}")
+                        company_data['daily_change'] = self._calculate_daily_change(ticker)
                             
                         # Cache the result
                         self.cache[ticker] = company_data
@@ -960,7 +1029,8 @@ class CompanyProfiler:
                         return company_data
                 except Exception as e:
                     print(f"Error getting Finnhub company data: {e}")
-                    
+                    # Continue to fallback
+            
             # Fallback to Yahoo Finance
             return self._get_yf_profile(ticker)
             
@@ -969,13 +1039,13 @@ class CompanyProfiler:
             # Fallback to Yahoo Finance
             return self._get_yf_profile(ticker)
             
-    def _get_yf_profile(self, ticker):
+    def _get_yf_profile(self, ticker: str) -> Dict[str, Any]:
         """Fallback method to get company profile from Yahoo Finance"""
         try:
             yf_ticker = yf.Ticker(ticker)
             info = yf_ticker.info
             
-            if not info or 'shortName' not in info:
+            if not info or not isinstance(info, dict) or 'shortName' not in info:
                 return self._create_skeleton_profile(ticker)
                 
             # Create profile from Yahoo Finance data
@@ -986,9 +1056,9 @@ class CompanyProfiler:
                 'industry': info.get('industry', 'Technology'),
                 'market_cap': info.get('marketCap', 0),
                 'website': info.get('website', '#'),
-                'logo': '', # Yahoo doesn't provide logos
+                'logo': '',  # Yahoo doesn't provide logos
                 'country': info.get('country', 'USA'),
-                'ipo_date': '', # Not readily available
+                'ipo_date': '',  # Not readily available
                 'current_price': info.get('currentPrice', self._get_current_price(ticker)),
                 'description': info.get('longBusinessSummary', 'No description available.'),
                 'pe_ratio': info.get('trailingPE', 0),
@@ -999,24 +1069,19 @@ class CompanyProfiler:
                 '52w_low': info.get('fiftyTwoWeekLow', 0),
                 'revenue': info.get('revenuePerShare', 0),
                 'profit_margin': info.get('profitMargins', 0) * 100 if info.get('profitMargins') else 0,
-                'daily_change': 0.0 # Default value
+                'daily_change': 0.0  # Default value
             }
             
             # Calculate daily change
             try:
-                if 'previousClose' in info and info['previousClose'] > 0:
+                if 'previousClose' in info and info['previousClose'] > 0 and company_data['current_price'] > 0:
                     current = company_data['current_price']
                     prev = info['previousClose']
                     daily_change = ((current - prev) / prev) * 100
                     company_data['daily_change'] = round(daily_change, 2)
                 else:
                     # Alternative calculation using historical data
-                    hist = yf_ticker.history(period="2d")
-                    if not hist.empty and len(hist) >= 2:
-                        today_close = hist['Close'].iloc[-1]
-                        yesterday_close = hist['Close'].iloc[-2]
-                        daily_change = ((today_close - yesterday_close) / yesterday_close) * 100
-                        company_data['daily_change'] = round(daily_change, 2)
+                    company_data['daily_change'] = self._calculate_daily_change(ticker)
             except Exception as e:
                 print(f"Error calculating daily change: {str(e)}")
                 
@@ -1031,7 +1096,7 @@ class CompanyProfiler:
             # If all fails, return a skeleton profile
             return self._create_skeleton_profile(ticker)
             
-    def _create_skeleton_profile(self, ticker):
+    def _create_skeleton_profile(self, ticker: str) -> Dict[str, Any]:
         """Create a skeleton profile when APIs fail"""
         current_price = self._get_current_price(ticker)
         
@@ -1064,18 +1129,37 @@ class CompanyProfiler:
         
         return skeleton_profile
         
-    def _get_current_price(self, ticker):
+    def _get_current_price(self, ticker: str) -> float:
         """Get the current price for a ticker"""
         try:
             data = yf.download(ticker, period="1d", progress=False)
-            if not data.empty:
-                return data['Close'].iloc[-1]
-            return 0
-        except:
-            return 0
+            if not data.empty and 'Close' in data.columns:
+                return float(data['Close'].iloc[-1])
+            return 0.0
+        except Exception as e:
+            print(f"Error getting current price for {ticker}: {e}")
+            return 0.0
+    
+    def _calculate_daily_change(self, ticker: str) -> float:
+        """Calculate the daily percentage change for a ticker"""
+        try:
+            df = yf.download(ticker, period="2d", progress=False)
+            if not df.empty and len(df) >= 2 and 'Close' in df.columns:
+                today_close = df['Close'].iloc[-1]
+                yesterday_close = df['Close'].iloc[-2]
+                if yesterday_close > 0:  # Avoid division by zero
+                    daily_change = ((today_close - yesterday_close) / yesterday_close) * 100
+                    return round(daily_change, 2)
+            return 0.0
+        except Exception as e:
+            print(f"Error calculating daily change: {str(e)}")
+            return 0.0
             
-    def search_companies(self, query):
+    def search_companies(self, query: str) -> List[Dict[str, str]]:
         """Search for companies by name or ticker"""
+        if not query or len(query.strip()) == 0:
+            return []
+            
         try:
             # Try using different search methods
             results = []
@@ -1084,13 +1168,13 @@ class CompanyProfiler:
             if FINNHUB_AVAILABLE and finnhub_client:
                 try:
                     finnhub_results = finnhub_client.symbol_lookup(query)
-                    if finnhub_results and 'result' in finnhub_results:
+                    if finnhub_results and isinstance(finnhub_results, dict) and 'result' in finnhub_results:
                         for item in finnhub_results['result']:
-                            if item['type'] == 'Common Stock':
+                            if item.get('type') == 'Common Stock':
                                 results.append({
-                                    'name': item['description'],
-                                    'ticker': item['symbol'],
-                                    'exchange': item['exchange']
+                                    'name': item.get('description', ''),
+                                    'ticker': item.get('symbol', ''),
+                                    'exchange': item.get('exchange', '')
                                 })
                 except Exception as e:
                     print(f"Finnhub search error: {e}")
@@ -1119,37 +1203,161 @@ class CompanyProfiler:
                     matched_tickers.append(ticker)
                     
             # If the query itself looks like a ticker symbol, add it
-            if query.isalpha() and len(query) <= 5:
+            if query.isalpha():
                 matched_tickers.append(query.upper())
                 
             # Get profiles for matched tickers
             for ticker in matched_tickers:
                 try:
                     profile = self.get_company_profile(ticker)
-                    results.append({
-                        'name': profile['name'],
-                        'ticker': profile['ticker'],
-                        'exchange': profile['exchange']
-                    })
+                    if profile:
+                        results.append({
+                            'name': profile['name'],
+                            'ticker': profile['ticker'],
+                            'exchange': profile['exchange']
+                        })
                 except Exception as e:
                     print(f"Error getting profile for {ticker}: {e}")
                     
-            # If we still don't have results, try a generic approach
-            if not results and query.isalpha():
-                try:
-                    profile = self.get_company_profile(query.upper())
-                    results.append({
-                        'name': profile['name'],
-                        'ticker': profile['ticker'],
-                        'exchange': profile['exchange']
-                    })
-                except:
-                    pass
+            # Remove duplicates based on ticker
+            unique_results = []
+            seen_tickers = set()
+            for result in results:
+                if result['ticker'] not in seen_tickers:
+                    seen_tickers.add(result['ticker'])
+                    unique_results.append(result)
                     
-            return results[:10] # Limit to 10 results
+            return unique_results[:10]  # Limit to 10 results
         except Exception as e:
             print(f"Error searching companies: {e}")
             return []
+    
+    def get_stock_history(self, ticker: str, period: str = '1y') -> Dict[str, Any]:
+        """Get historical stock data for a ticker"""
+        try:
+            data = yf.download(ticker, period=period, progress=False)
+            if data.empty:
+                return {'dates': [], 'prices': []}
+                
+            # Format the data
+            dates = data.index.strftime('%Y-%m-%d').tolist()
+            prices = data['Close'].tolist()
+            
+            return {
+                'dates': dates,
+                'prices': prices
+            }
+        except Exception as e:
+            print(f"Error getting stock history for {ticker}: {e}")
+            return {'dates': [], 'prices': []}
+    
+    def create_company_chart(self, ticker: str, period: str = '1y') -> str:
+        """Create a price chart for a single company using the comparison chart method"""
+        # Simply call the comparison chart with a single ticker
+        return self.create_comparison_chart([ticker], period)
+    
+    def create_comparison_chart(self, tickers: List[str], period: str = '1y') -> str:
+        """Create a comparison chart for multiple stocks"""
+        try:
+            if not tickers:
+                return json.dumps({})
+                
+            # Get data for each ticker
+            tickers_data = {}
+            for ticker in tickers:
+                data = self.get_stock_history(ticker, period)
+                if data['dates'] and data['prices']:
+                    tickers_data[ticker] = data
+            
+            if not tickers_data:
+                return json.dumps({})
+                
+            # Create figure
+            fig = go.Figure()
+            
+            # Define colors
+            colors = ['#00E5FF', '#76FF03', '#FF1744', '#FFD600', '#F50057']  # Dystopian colors
+            
+            # If we're showing a single stock, use actual prices instead of normalized
+            if len(tickers_data) == 1:
+                ticker = list(tickers_data.keys())[0]
+                data = tickers_data[ticker]
+                
+                fig.add_trace(go.Scatter(
+                    x=data['dates'],
+                    y=data['prices'],
+                    mode='lines',
+                    name=ticker,
+                    line=dict(color=colors[0], width=2)
+                ))
+                
+                title_text = f'{ticker} Price History'
+                y_axis_title = 'Price'
+            else:
+                # Normalize all prices to the same starting point (100) for multiple stocks
+                for i, (ticker, data) in enumerate(tickers_data.items()):
+                    dates = data['dates']
+                    prices = data['prices']
+                    
+                    # Make sure we have data
+                    if not prices or len(prices) < 2:
+                        continue
+                    
+                    # Normalize prices
+                    start_price = prices[0]
+                    if start_price > 0:
+                        normalized_prices = [price / start_price * 100 for price in prices]
+                        
+                        fig.add_trace(go.Scatter(
+                            x=dates,
+                            y=normalized_prices,
+                            mode='lines',
+                            name=ticker,
+                            line=dict(color=colors[i % len(colors)], width=2)
+                        ))
+                
+                title_text = 'Normalized Price Comparison'
+                y_axis_title = 'Normalized Price (Start = 100)'
+            
+            # Update layout with dystopian styling
+            fig.update_layout(
+                title={
+                    'text': title_text,
+                    'y': 0.95,
+                    'x': 0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top',
+                    'font': {'family': 'Arial, sans-serif', 'size': 24, 'color': '#0ff8e7'}
+                },
+                xaxis={
+                    'title': {
+                        'text': 'Date',
+                        'font': {'family': 'Arial, sans-serif', 'size': 18, 'color': '#8194a9'}
+                    },
+                    'gridcolor': 'rgba(40, 40, 40, 0.8)',
+                    'tickfont': {'color': '#8194a9'}
+                },
+                yaxis={
+                    'title': {
+                        'text': y_axis_title,
+                        'font': {'family': 'Arial, sans-serif', 'size': 18, 'color': '#8194a9'}
+                    },
+                    'gridcolor': 'rgba(40, 40, 40, 0.8)',
+                    'tickfont': {'color': '#8194a9'}
+                },
+                hovermode='x unified',
+                legend={
+                    'font': {'family': 'Arial, sans-serif', 'size': 14, 'color': '#a4b8c4'}
+                },
+                font={'family': 'Arial, sans-serif', 'color': '#a4b8c4'},
+                plot_bgcolor='rgba(15, 15, 20, 0.95)',
+                paper_bgcolor='rgba(15, 15, 20, 0.95)'
+            )
+            
+            return json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+        except Exception as e:
+            print(f"Error creating chart: {e}")
+            return json.dumps({})
 
 # Initialize the company profiler
 company_profiler = CompanyProfiler()
@@ -1583,7 +1791,13 @@ def portfolio_optimizer():
         # Get tickers from form
         tickers_input = request.form["tickers"].strip()
         tickers = [t.strip() for t in tickers_input.split(',')]
+        
+        # Get risk preference from form with validation
         risk_preference = request.form.get("risk_preference", "moderate")
+        
+        # Validate risk preference is one of the allowed values
+        if risk_preference not in ["low", "moderate", "high"]:
+            risk_preference = "moderate"  # Default to moderate if invalid value
         
         try:
             # Initialize optimizer
@@ -1593,19 +1807,35 @@ def portfolio_optimizer():
             results = optimizer.optimize_portfolio(tickers, risk_preference=risk_preference)
             
             if results is None:
-                return render_template("portfolio.html", error="No data found for the given tickers.", current_date=current_date)
-                
+                return render_template("portfolio.html", 
+                                      error="No data found for the given tickers.", 
+                                      current_date=current_date,
+                                      risk_options=["low", "moderate", "high"],
+                                      selected_risk=risk_preference)
+            
             # Get company profiles for all tickers
             for asset in results["portfolio_data"]:
                 ticker = asset["ticker"]
                 asset["company_info"] = company_profiler.get_company_profile(ticker)
-                
-            return render_template("portfolio.html", results=results, current_date=current_date)
+            
+            return render_template("portfolio.html", 
+                                  results=results, 
+                                  current_date=current_date,
+                                  risk_options=["low", "moderate", "high"],
+                                  selected_risk=risk_preference)
             
         except Exception as e:
-            return render_template("portfolio.html", error=f"Error optimizing portfolio: {str(e)}", current_date=current_date)
-            
-    return render_template("portfolio.html", current_date=current_date)
+            return render_template("portfolio.html", 
+                                  error=f"Error optimizing portfolio: {str(e)}", 
+                                  current_date=current_date,
+                                  risk_options=["low", "moderate", "high"],
+                                  selected_risk=risk_preference)
+    
+    # For GET requests, just render the form with default options
+    return render_template("portfolio.html", 
+                          current_date=current_date,
+                          risk_options=["low", "moderate", "high"],
+                          selected_risk="moderate")
 
 @app.route("/ticker_search", methods=["GET", "POST"])
 def ticker_search():

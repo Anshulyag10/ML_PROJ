@@ -285,6 +285,9 @@ class TickerSearchService {
           });
           
           // Limit to first 5 matches per region
+
+
+          
           const displayedMatches = matches.slice(0, 5);
           
           displayedMatches.forEach(ticker => {
